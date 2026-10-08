@@ -1,0 +1,8 @@
+system_id: bookchaowalit-backend/book-backend/book-api-gateway
+prefix: CARD
+brand: "BOOK API GATEWAY"
+subtitle: "pilot gateway ที่ทดสอบแล้ว: auth, rate limit, allow-list proxy"
+footer: "Book API Gateway — Product Card"
+color: "#2f4b6e"
+audience: internal
+tier: L0
