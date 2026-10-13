@@ -1,4 +1,4 @@
-# book-api-gateway
+# platform-api-gateway
 
 `API Gateway` platform boundary for the Book Platform portfolio.
 
@@ -13,8 +13,8 @@ customer payload.
 ## Boundary
 
 - Owner: `bookchaowalit-backend`
-- Repository: `book-api-gateway`
-- Target remote: `https://github.com/bookchaowalit-backend/book-api-gateway.git` (published; runtime not activated)
+- Repository: `platform-api-gateway`
+- Target remote: `https://github.com/bookchaowalit-backend/platform-api-gateway.git` (published; runtime not activated)
 - Contract: `book-platform.contract.v1`
 - Status: `pilot` (local only)
 - Data owner: the platform boundary identified in `contract.json`
