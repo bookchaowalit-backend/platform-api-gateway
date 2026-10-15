@@ -23,19 +23,16 @@ from book_api_gateway.server import create_server, upstream_tcp_probe  # noqa: E
 
 
 class RecordingUpstreamHandler(BaseHTTPRequestHandler):
-    records: list[dict] = []
-    mode = "ok"
-
     def _respond(self) -> None:
-        if self.mode == "sleep":
+        if self.server.mode == "sleep":
             time.sleep(0.2)
-        if self.mode == "redirect":
+        if self.server.mode == "redirect":
             self.send_response(302)
             self.send_header("Location", "http://example.com/unsafe")
             self.send_header("Content-Length", "0")
             self.end_headers()
             return
-        if self.mode == "error":
+        if self.server.mode == "error":
             encoded = b'{"upstream_secret":"should-not-cross-boundary"}'
             self.send_response(503)
             self.send_header("Content-Type", "application/json")
@@ -51,7 +48,7 @@ class RecordingUpstreamHandler(BaseHTTPRequestHandler):
             "body": body,
             "headers": {key.lower(): value for key, value in self.headers.items()},
         }
-        self.records.append(record)
+        self.server.records.append(record)
         payload = {
             "ok": True,
             "path": self.path,
@@ -77,6 +74,17 @@ class RecordingUpstreamHandler(BaseHTTPRequestHandler):
 
     def log_message(self, *_args: object) -> None:
         return
+
+
+class RecordingUpstreamServer(ThreadingHTTPServer):
+    """Own recording state per fixture and drain handlers before closing."""
+
+    daemon_threads = False
+
+    def __init__(self) -> None:
+        self.records: list[dict] = []
+        self.mode = "ok"
+        super().__init__(("127.0.0.1", 0), RecordingUpstreamHandler)
 
 
 def start_server(server: ThreadingHTTPServer) -> threading.Thread:
@@ -122,9 +130,7 @@ class GatewayTests(unittest.TestCase):
     token = "super-secret-token"
 
     def setUp(self) -> None:
-        RecordingUpstreamHandler.records = []
-        RecordingUpstreamHandler.mode = "ok"
-        self.upstream = ThreadingHTTPServer(("127.0.0.1", 0), RecordingUpstreamHandler)
+        self.upstream = RecordingUpstreamServer()
         start_server(self.upstream)
         self.telemetry: list[dict] = []
         self.gateway: ThreadingHTTPServer | None = None
@@ -154,7 +160,7 @@ class GatewayTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(payload["status"], "ok")
         self.assertTrue(payload["upstream_reachable"])
-        self.assertEqual(RecordingUpstreamHandler.records, [], "readiness must not send upstream HTTP requests")
+        self.assertEqual(self.upstream.records, [], "readiness must not send upstream HTTP requests")
 
     def test_readyz_is_503_when_upstream_down_but_healthz_stays_200(self) -> None:
         base_url = self.start_gateway()
@@ -216,7 +222,7 @@ class GatewayTests(unittest.TestCase):
         self.assertEqual(payload["request_id"], "req-123")
         self.assertFalse(payload["has_authorization"])
         self.assertTrue(payload["subject"].startswith("token:"))
-        self.assertEqual(len(RecordingUpstreamHandler.records), 1)
+        self.assertEqual(len(self.upstream.records), 1)
 
     def test_rate_limit_is_deterministic_per_subject(self) -> None:
         base_url = self.start_gateway(rate_limit=1)
@@ -230,7 +236,7 @@ class GatewayTests(unittest.TestCase):
         self.assertEqual(payload["error"], "rate limit exceeded")
 
     def test_upstream_timeout_returns_sanitized_504(self) -> None:
-        RecordingUpstreamHandler.mode = "sleep"
+        self.upstream.mode = "sleep"
         base_url = self.start_gateway(timeout=0.05)
         status, _headers, payload = call(
             f"{base_url}/api/demo/slow", headers={"Authorization": f"Bearer {self.token}"}
@@ -241,7 +247,7 @@ class GatewayTests(unittest.TestCase):
         self.assertNotIn("Traceback", json.dumps(payload))
 
     def test_upstream_failure_and_redirect_are_sanitized(self) -> None:
-        RecordingUpstreamHandler.mode = "error"
+        self.upstream.mode = "error"
         base_url = self.start_gateway()
         headers = {"Authorization": f"Bearer {self.token}"}
         status, _headers, payload = call(f"{base_url}/api/demo/error", headers=headers)
@@ -249,7 +255,7 @@ class GatewayTests(unittest.TestCase):
         self.assertEqual(payload["error"], "upstream unavailable")
         self.assertNotIn("should-not-cross-boundary", json.dumps(payload))
 
-        RecordingUpstreamHandler.mode = "redirect"
+        self.upstream.mode = "redirect"
         status, _headers, payload = call(f"{base_url}/api/demo/redirect", headers=headers)
         self.assertEqual(status, 502)
         self.assertEqual(payload["error"], "upstream unavailable")
@@ -263,7 +269,7 @@ class GatewayTests(unittest.TestCase):
 
         self.assertEqual(status, 400)
         self.assertEqual(payload["error"], "query parameters are not supported by the pilot")
-        self.assertEqual(RecordingUpstreamHandler.records, [])
+        self.assertEqual(self.upstream.records, [])
 
     def test_missing_gateway_token_fails_closed(self) -> None:
         config = GatewayConfig(
@@ -315,7 +321,7 @@ class GatewayTests(unittest.TestCase):
                 )
                 self.assertTrue(response.startswith(b"HTTP/1.1 400 "), response[:80])
                 self.assertIn(b"invalid request path", response)
-        self.assertEqual(RecordingUpstreamHandler.records, [])
+        self.assertEqual(self.upstream.records, [])
 
     def test_rejected_request_body_is_not_parsed_as_a_second_request(self) -> None:
         self.start_gateway()
@@ -345,7 +351,7 @@ class GatewayTests(unittest.TestCase):
 
         self.assertEqual(response.count(b"HTTP/1.1 "), 1, response)
         self.assertTrue(response.startswith(b"HTTP/1.1 411 "))
-        self.assertEqual(RecordingUpstreamHandler.records, [])
+        self.assertEqual(self.upstream.records, [])
 
     def test_ambiguous_content_length_is_rejected(self) -> None:
         self.start_gateway()
@@ -360,7 +366,7 @@ class GatewayTests(unittest.TestCase):
                 )
                 self.assertTrue(response.startswith(b"HTTP/1.1 400 "), response[:80])
                 self.assertIn(b"invalid content length", response)
-        self.assertEqual(RecordingUpstreamHandler.records, [])
+        self.assertEqual(self.upstream.records, [])
 
     def test_successful_requests_keep_the_connection_reusable(self) -> None:
         self.start_gateway()
@@ -368,7 +374,7 @@ class GatewayTests(unittest.TestCase):
         response = raw_exchange(self.gateway.server_port, request + request)
 
         self.assertEqual(response.count(b"HTTP/1.1 200 "), 2, response)
-        self.assertEqual(len(RecordingUpstreamHandler.records), 2)
+        self.assertEqual(len(self.upstream.records), 2)
 
     def test_server_header_does_not_disclose_runtime_version(self) -> None:
         base_url = self.start_gateway()
@@ -392,6 +398,46 @@ class GatewayTests(unittest.TestCase):
         for value in (float("nan"), float("inf")):
             with self.assertRaises(ConfigError):
                 GatewayConfig(api_token=self.token, upstream_timeout_seconds=value)
+
+
+class RecordingUpstreamIsolationTests(unittest.TestCase):
+    def test_timed_out_request_cannot_record_into_next_fixture(self) -> None:
+        entered = threading.Event()
+        release = threading.Event()
+        finished = threading.Event()
+        original_respond = RecordingUpstreamHandler._respond
+
+        def blocked_respond(handler) -> None:
+            entered.set()
+            try:
+                if not release.wait(timeout=2.0):
+                    raise RuntimeError("test did not release the upstream handler")
+                original_respond(handler)
+            finally:
+                finished.set()
+
+        previous = GatewayTests()
+        previous.setUp()
+        self.addCleanup(previous.tearDown)
+        next_fixture = GatewayTests()
+        try:
+            with mock.patch.object(RecordingUpstreamHandler, "_respond", blocked_respond):
+                base_url = previous.start_gateway(timeout=0.05)
+                status, _headers, _payload = call(
+                    f"{base_url}/api/demo/slow",
+                    headers={"Authorization": f"Bearer {previous.token}"},
+                )
+                self.assertTrue(entered.wait(timeout=2.0))
+                self.assertEqual(status, 504)
+                # Advance to another fixture while the old upstream request is
+                # still alive, then let its record append happen deterministically.
+                next_fixture.setUp()
+                self.addCleanup(next_fixture.tearDown)
+                release.set()
+                self.assertTrue(finished.wait(timeout=2.0))
+                next_fixture.test_readyz_reports_ready_when_upstream_reachable()
+        finally:
+            release.set()
 
 
 if __name__ == "__main__":

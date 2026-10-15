@@ -11,7 +11,6 @@ from __future__ import annotations
 import sys
 import unittest
 from http.client import HTTPConnection
-from http.server import ThreadingHTTPServer
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -20,7 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from book_api_gateway.config import GatewayConfig  # noqa: E402
 from book_api_gateway.server import PUBLIC, ROUTE_ACCESS, SERVICE, create_server  # noqa: E402
-from test_gateway import RecordingUpstreamHandler, start_server  # noqa: E402
+from test_gateway import RecordingUpstreamServer, start_server  # noqa: E402
 
 EXPECTED = {
     "/healthz": (PUBLIC, {"GET"}),
@@ -46,9 +45,7 @@ class RouteAccessTableTests(unittest.TestCase):
 
 class RouteAccessMatrixTests(unittest.TestCase):
     def setUp(self) -> None:
-        RecordingUpstreamHandler.records = []
-        RecordingUpstreamHandler.mode = "ok"
-        self.upstream = ThreadingHTTPServer(("127.0.0.1", 0), RecordingUpstreamHandler)
+        self.upstream = RecordingUpstreamServer()
         start_server(self.upstream)
         config = GatewayConfig(
             api_token=TOKEN,
@@ -93,7 +90,7 @@ class RouteAccessMatrixTests(unittest.TestCase):
                             self.assertEqual(status, 200)
                         else:
                             self.assertEqual(status, 401)
-        forwarded = {(record["method"], record["path"]) for record in RecordingUpstreamHandler.records}
+        forwarded = {(record["method"], record["path"]) for record in self.upstream.records}
         self.assertEqual(forwarded, {("GET", "/api/demo/items"), ("POST", "/api/demo/items")})
 
     def test_unclassified_paths_are_not_served(self) -> None:
