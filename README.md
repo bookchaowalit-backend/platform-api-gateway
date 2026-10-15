@@ -43,6 +43,13 @@ GitHub Actions runs the same command on every push and pull request
 It uses only loopback fixtures and does not claim deployment, provider
 connectivity, data migration, or production readiness.
 
+Gate evidence for BOO-147 (external providers, webhook signatures, idempotency
+keys and privacy classes) is in
+[`docs/gates/BOO-147-webhook-provider-map.md`](docs/gates/BOO-147-webhook-provider-map.md).
+The map is `fixtures/gates/webhook-provider-map.json`, derived from the pinned
+source snapshot `fixtures/gates/webhook-provider-sources.json` and enforced by
+`tests/test_webhook_provider_map.py`.
+
 `scripts/check_schema_pin.py` fails when the vendored schema no longer
 matches the sha256 pinned in `schema/book-platform.contract.v1.schema.json.sha256`
 (the canonical copy lives in `bookchaowalit-backend-core/contracts/`; change it

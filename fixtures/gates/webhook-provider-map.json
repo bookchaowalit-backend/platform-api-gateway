@@ -1,0 +1,1896 @@
+{
+  "fixture": "boo-147.webhook-provider-map.v1",
+  "issue": "BOO-147",
+  "next_gate": "Map every external provider, signature check, idempotency key, and privacy class.",
+  "contract": {
+    "repository": "bookchaowalit/architecture-docs",
+    "path": "systems/architecture/solo-empire-api-contract-v1.md",
+    "anchor": "#signed-and-authenticated-webhook-routes",
+    "revision": "a9c8472744e0f97599589a38afcd3ae5cc5c8a2a",
+    "contract_status": "retired",
+    "webhook_routes": [
+      "POST /api/webhook/line",
+      "POST /api/webhook/stripe",
+      "POST /api/webhook/analytics",
+      "POST /api/webhook/revenue"
+    ],
+    "provider_read_routes": [
+      "GET /api/integrations/sentry/issues",
+      "GET /api/integrations/posthog/insights",
+      "GET /api/integrations/slack/channels",
+      "GET /api/integrations/notion/search",
+      "GET /api/integrations/asana/workspaces",
+      "GET /api/integrations/asana/projects",
+      "GET /api/integrations/linear/teams",
+      "GET /api/integrations/linear/projects",
+      "GET /api/integrations/discord/guilds",
+      "GET /api/integrations/whatsapp-business/phone-numbers",
+      "GET /api/integrations/microsoft-graph/me",
+      "GET /api/integrations/zoom/me",
+      "GET /api/integrations/monday/boards"
+    ],
+    "aggregate_routes": {
+      "GET /api/integrations/health": "health_check",
+      "GET /api/integrations/discovery": "discovery_source",
+      "GET /api/ai/status": "ai_provider",
+      "POST /api/ai/generate": "ai_provider"
+    }
+  },
+  "sources": {
+    "gateway": "bookchaowalit-backend/platform-api-gateway@6e1fb34489779582b55ad86f09940b46f3d7a17a",
+    "solo_empire_integrations": "bookchaowalit/solo-empire@981a12dbb86de1f40512ec254bb5dc064b51bfb9:integrations/ (directory removed in daf06f31, 2026-10-11)",
+    "solo_empire_signed_webhooks": "bookchaowalit/solo-empire@1d0e04bb04af74cc05d4733da35719f2dfad6bf6:infra/api/server.ts (last tree with live LINE/Stripe handlers)",
+    "solo_empire_bearer_webhooks": "bookchaowalit/solo-empire@aa567aab40382d36e02523ee546bbad0080309ec:infra/api/server.ts (last tree with live analytics/revenue handlers)",
+    "legacy_archive": "bookchaowalit/platform-legacy-api-archive@74b68443d35e0637641ba4ccdd63e5cdd723031a"
+  },
+  "privacy_classes": [
+    "public",
+    "internal",
+    "private",
+    "restricted"
+  ],
+  "privacy_class_vocabulary_source": "bookchaowalit/solo-empire@9f44f602^:infra/scripts/cli/data-intake-cli.py:63",
+  "gateway": {
+    "route_classes": {
+      "/healthz": {
+        "access": "public",
+        "methods": [
+          "GET"
+        ],
+        "external_provider_ingress": false
+      },
+      "/readyz": {
+        "access": "public",
+        "methods": [
+          "GET"
+        ],
+        "external_provider_ingress": false
+      },
+      "/api/*": {
+        "access": "service",
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "external_provider_ingress": false
+      }
+    },
+    "contract_interfaces": {
+      "api-gateway.http.healthz": "not-a-provider-route",
+      "api-gateway.http.readyz": "not-a-provider-route",
+      "api-gateway.http.proxy": "carries provider-shaped paths only as an authenticated service passthrough",
+      "api-gateway.http.upstream": "internal allow-listed upstream, not an external provider",
+      "api-gateway.event.request-completed": "redacted telemetry, not an external provider",
+      "api-gateway.consumes.identity": "internal platform dependency (planned), not an external provider"
+    },
+    "signed_webhook_route_class": "missing",
+    "signature_verification": "missing",
+    "forwarded_request_headers": [
+      "Accept",
+      "Content-Type",
+      "If-Match",
+      "If-None-Match"
+    ],
+    "forwards_signature_headers": false,
+    "forwards_idempotency_key": false,
+    "evidence": [
+      "src/book_api_gateway/server.py:28",
+      "src/book_api_gateway/server.py:38-42",
+      "src/book_api_gateway/server.py:212-229",
+      "src/book_api_gateway/server.py:306-314"
+    ]
+  },
+  "providers": [
+    {
+      "provider": "line",
+      "name": "LINE Messaging API (Official Account)",
+      "direction": "inbound-webhook",
+      "routes": [
+        "POST /api/webhook/line"
+      ],
+      "lifecycle": "retired-410",
+      "auth_class": "signed-webhook",
+      "signature": {
+        "scheme": "HMAC-SHA256 over the exact raw body, base64 digest, constant-time compare",
+        "header": "x-line-signature",
+        "secret_env": "LINE_SOLO_EMPIRE_WEBHOOK_SECRET",
+        "verification_location": "platform-legacy-api-archive@74b68443:line.ts:8-23; called at solo-empire@1d0e04bb:infra/api/server.ts:975",
+        "gateway_verification": "missing",
+        "failure_status": 401,
+        "unconfigured_status": 503
+      },
+      "idempotency": {
+        "key_source": "event.webhookEventId, else event.message.id (getLineEventExternalId)",
+        "dedupe_store": "webhook_log(source='line', external_id) lookup before insert",
+        "duplicate_response": "200 with duplicate_events count",
+        "evidence": "platform-legacy-api-archive@74b68443:line.ts:34-42; solo-empire@1d0e04bb:infra/api/server.ts:1004-1012",
+        "gaps": [
+          "events without webhookEventId or message.id are inserted without dedupe",
+          "no unique index; check-then-insert only"
+        ]
+      },
+      "replay_window": {
+        "status": "missing",
+        "detail": "no timestamp check; LINE event.timestamp is not validated, replay protection relies only on the event-id lookup",
+        "evidence": "solo-empire@1d0e04bb:infra/api/server.ts:965-1031"
+      },
+      "privacy_class": "restricted",
+      "privacy_class_basis": "cited",
+      "privacy_evidence": "solo-empire@981a12db:integrations/line/README.md:97-101 (--privacy-class restricted, retention customer-communications)",
+      "evidence": [
+        "architecture-docs@a9c84727:systems/architecture/solo-empire-api-contract-v1.md:61",
+        "architecture-docs@a9c84727:systems/architecture/solo-empire-api-contract-v1.md:140",
+        "solo-empire@981a12db:integrations/line/README.md:50-52",
+        "solo-empire@981a12db:integrations/README.md:98-109",
+        "platform-legacy-api-archive@74b68443:server.ts:983-986",
+        "solo-empire@981a12db:infra/scripts/sync/integration_health.py:242-268"
+      ],
+      "health_check": "check_line",
+      "health_status": "active",
+      "credential_refs": [
+        "LINE_SOLO_EMPIRE_CHANNEL_ACCESS_TOKEN",
+        "LINE_SOLO_EMPIRE_WEBHOOK_SECRET"
+      ],
+      "outbound_calls": [
+        {
+          "via": "GET /api/integrations/health",
+          "call": "https://api.line.me/v2/bot/info",
+          "evidence": "solo-empire@981a12db:infra/scripts/sync/integration_health.py:259",
+          "credential_refs": [
+            "LINE_SOLO_EMPIRE_CHANNEL_ACCESS_TOKEN"
+          ]
+        }
+      ],
+      "directions": [
+        "inbound",
+        "outbound"
+      ],
+      "discovery_source": null,
+      "ai_provider": null
+    },
+    {
+      "provider": "stripe",
+      "name": "Stripe webhooks",
+      "direction": "inbound-webhook",
+      "routes": [
+        "POST /api/webhook/stripe"
+      ],
+      "lifecycle": "retired-410",
+      "auth_class": "signed-webhook",
+      "signature": {
+        "scheme": "Stripe v1: HMAC-SHA256 hex over `${t}.${rawBody}`, any v1 candidate, constant-time compare",
+        "header": "stripe-signature",
+        "secret_env": "STRIPE_WEBHOOK_SECRET",
+        "verification_location": "platform-legacy-api-archive@74b68443:stripe.ts:12-53; called at solo-empire@1d0e04bb:infra/api/server.ts:1046",
+        "gateway_verification": "missing",
+        "failure_status": 400,
+        "unconfigured_status": 503
+      },
+      "idempotency": {
+        "key_source": "Stripe event `id` (body.id)",
+        "dedupe_store": "webhook_log(source='stripe', external_id) lookup before insert",
+        "duplicate_response": "200 with duplicate_events=1",
+        "evidence": "solo-empire@1d0e04bb:infra/api/server.ts:1062-1079",
+        "gaps": [
+          "no unique index; check-then-insert only"
+        ]
+      },
+      "replay_window": {
+        "status": "enforced",
+        "seconds": 300,
+        "detail": "|now - t| <= 300 s on the signed timestamp",
+        "evidence": "platform-legacy-api-archive@74b68443:stripe.ts:17,33-37"
+      },
+      "privacy_class": "restricted",
+      "privacy_class_basis": "proposed",
+      "privacy_evidence": "raw payment event body is persisted verbatim (solo-empire@1d0e04bb:infra/api/server.ts:1079); payment events can carry customer contact and billing fields",
+      "evidence": [
+        "architecture-docs@a9c84727:systems/architecture/solo-empire-api-contract-v1.md:61",
+        "architecture-docs@a9c84727:systems/architecture/solo-empire-api-contract-v1.md:141",
+        "solo-empire@981a12db:integrations/README.md:111-121",
+        "solo-empire@981a12db:integrations/EXTERNAL-APP-REGISTRY.md:47-50",
+        "platform-legacy-api-archive@74b68443:server.ts:983-986",
+        "solo-empire@981a12db:infra/scripts/sync/integration_health.py:270-297"
+      ],
+      "health_check": "check_stripe",
+      "health_status": "active",
+      "credential_refs": [
+        "STRIPE_SECRET_KEY",
+        "STRIPE_WEBHOOK_SECRET"
+      ],
+      "outbound_calls": [
+        {
+          "via": "GET /api/integrations/health",
+          "call": "https://api.stripe.com/v1/balance",
+          "evidence": "solo-empire@981a12db:infra/scripts/sync/integration_health.py:288",
+          "credential_refs": [
+            "STRIPE_SECRET_KEY"
+          ]
+        }
+      ],
+      "directions": [
+        "inbound",
+        "outbound"
+      ],
+      "discovery_source": null,
+      "ai_provider": null
+    },
+    {
+      "provider": "internal-analytics-push",
+      "name": "Analytics metrics push (internal caller, Bearer)",
+      "direction": "inbound-webhook",
+      "routes": [
+        "POST /api/webhook/analytics"
+      ],
+      "lifecycle": "retired-410",
+      "auth_class": "bearer",
+      "signature": {
+        "scheme": "none (Bearer token with api:write scope via generic /api/webhook/* guard)",
+        "header": "Authorization",
+        "secret_env": "API_TOKEN / API_TOKENS_JSON",
+        "verification_location": "solo-empire@aa567aab:infra/api/server.ts:1294-1300",
+        "gateway_verification": "bearer only (src/book_api_gateway/server.py:212-229)",
+        "failure_status": 401,
+        "unconfigured_status": 503
+      },
+      "idempotency": {
+        "key_source": "natural key (asset_id, metric_date)",
+        "dedupe_store": "asset_metrics upsert ON CONFLICT(asset_id, metric_date); totals updated by delta",
+        "duplicate_response": "200 {success, updated:true}",
+        "evidence": "solo-empire@aa567aab:infra/api/server.ts:1416-1487",
+        "gaps": []
+      },
+      "replay_window": {
+        "status": "not-applicable",
+        "detail": "no timestamp; replay converges because the upsert is idempotent per natural key",
+        "evidence": "solo-empire@aa567aab:infra/api/server.ts:1458-1484"
+      },
+      "privacy_class": "internal",
+      "privacy_class_basis": "proposed",
+      "privacy_evidence": "aggregate per-asset counters only (views, subscribers, revenue, engagement_rate)",
+      "evidence": [
+        "architecture-docs@a9c84727:systems/architecture/solo-empire-api-contract-v1.md:60",
+        "architecture-docs@a9c84727:systems/architecture/solo-empire-api-contract-v1.md:142",
+        "platform-legacy-api-archive@74b68443:server.ts:988-990"
+      ],
+      "health_check": null,
+      "health_status": null,
+      "credential_refs": [
+        "API_TOKEN",
+        "API_TOKENS_JSON"
+      ],
+      "outbound_calls": [],
+      "directions": [
+        "inbound"
+      ],
+      "discovery_source": null,
+      "ai_provider": null
+    },
+    {
+      "provider": "internal-revenue-push",
+      "name": "Revenue record push (internal caller, Bearer)",
+      "direction": "inbound-webhook",
+      "routes": [
+        "POST /api/webhook/revenue"
+      ],
+      "lifecycle": "retired-410",
+      "auth_class": "bearer",
+      "signature": {
+        "scheme": "none (Bearer token with api:write scope via generic /api/webhook/* guard)",
+        "header": "Authorization",
+        "secret_env": "API_TOKEN / API_TOKENS_JSON",
+        "verification_location": "solo-empire@aa567aab:infra/api/server.ts:1294-1300",
+        "gateway_verification": "bearer only (src/book_api_gateway/server.py:212-229)",
+        "failure_status": 401,
+        "unconfigured_status": 503
+      },
+      "idempotency": {
+        "key_source": "Idempotency-Key request header (required, 1..255 chars)",
+        "dedupe_store": "revenue.idempotency_key lookup before insert",
+        "duplicate_response": "200 {success:true, id, duplicate:true}",
+        "evidence": "solo-empire@aa567aab:infra/api/server.ts:1492-1531",
+        "gaps": [
+          "gateway drops Idempotency-Key when proxying (src/book_api_gateway/server.py:28)",
+          "no key expiry / retention rule"
+        ]
+      },
+      "replay_window": {
+        "status": "missing",
+        "detail": "no timestamp; a replay is absorbed only when the same Idempotency-Key is resent",
+        "evidence": "solo-empire@aa567aab:infra/api/server.ts:1489-1532"
+      },
+      "privacy_class": "restricted",
+      "privacy_class_basis": "proposed",
+      "privacy_evidence": "finance records (amount, source_name, description) written to the revenue ledger",
+      "evidence": [
+        "architecture-docs@a9c84727:systems/architecture/solo-empire-api-contract-v1.md:60",
+        "architecture-docs@a9c84727:systems/architecture/solo-empire-api-contract-v1.md:143",
+        "platform-legacy-api-archive@74b68443:server.ts:988-990"
+      ],
+      "health_check": null,
+      "health_status": null,
+      "credential_refs": [
+        "API_TOKEN",
+        "API_TOKENS_JSON"
+      ],
+      "outbound_calls": [],
+      "directions": [
+        "inbound"
+      ],
+      "discovery_source": null,
+      "ai_provider": null
+    },
+    {
+      "provider": "sentry",
+      "name": "Sentry",
+      "direction": "outbound-read-only",
+      "routes": [
+        "GET /api/integrations/sentry/issues"
+      ],
+      "lifecycle": "archived",
+      "auth_class": "bearer",
+      "signature": {
+        "scheme": "not-applicable (no inbound provider delivery)",
+        "header": "not-applicable",
+        "verification_location": "not-applicable",
+        "gateway_verification": "bearer only"
+      },
+      "idempotency": {
+        "key_source": "not-applicable (read-only GET)",
+        "gaps": []
+      },
+      "replay_window": {
+        "status": "not-applicable",
+        "detail": "read-only GET"
+      },
+      "privacy_class": "internal",
+      "privacy_class_basis": "proposed",
+      "privacy_evidence": "unresolved issue summaries only; event payloads never returned",
+      "evidence": [
+        "architecture-docs@a9c84727:systems/architecture/solo-empire-api-contract-v1.md:122",
+        "solo-empire@981a12db:integrations/EXTERNAL-APP-REGISTRY.md:52-56",
+        "solo-empire@981a12db:infra/scripts/sync/integration_health.py:308-338"
+      ],
+      "health_check": "check_sentry",
+      "health_status": "active",
+      "credential_refs": [
+        "SENTRY_AUTH_TOKEN",
+        "SENTRY_ORG_SLUG",
+        "SENTRY_BASE_URL"
+      ],
+      "outbound_calls": [
+        {
+          "via": "GET /api/integrations/health",
+          "call": "https://sentry.io/api/0/organizations/{org}/ (SENTRY_BASE_URL overrides host, line 301)",
+          "evidence": "solo-empire@981a12db:infra/scripts/sync/integration_health.py:326",
+          "credential_refs": [
+            "SENTRY_AUTH_TOKEN"
+          ]
+        }
+      ],
+      "directions": [
+        "outbound"
+      ],
+      "discovery_source": null,
+      "ai_provider": null
+    },
+    {
+      "provider": "posthog",
+      "name": "PostHog",
+      "direction": "outbound-read-only",
+      "routes": [
+        "GET /api/integrations/posthog/insights"
+      ],
+      "lifecycle": "archived",
+      "auth_class": "bearer",
+      "signature": {
+        "scheme": "not-applicable (no inbound provider delivery)",
+        "header": "not-applicable",
+        "verification_location": "not-applicable",
+        "gateway_verification": "bearer only"
+      },
+      "idempotency": {
+        "key_source": "not-applicable (read-only GET)",
+        "gaps": []
+      },
+      "replay_window": {
+        "status": "not-applicable",
+        "detail": "read-only GET"
+      },
+      "privacy_class": "internal",
+      "privacy_class_basis": "proposed",
+      "privacy_evidence": "saved-insight metadata; query, event, result and person payloads stripped",
+      "evidence": [
+        "architecture-docs@a9c84727:systems/architecture/solo-empire-api-contract-v1.md:123",
+        "solo-empire@981a12db:integrations/EXTERNAL-APP-REGISTRY.md:58-63",
+        "solo-empire@981a12db:infra/scripts/sync/integration_health.py:349-385"
+      ],
+      "health_check": "check_posthog",
+      "health_status": "active",
+      "credential_refs": [
+        "POSTHOG_API_KEY",
+        "POSTHOG_PROJECT_ID",
+        "POSTHOG_HOST"
+      ],
+      "outbound_calls": [
+        {
+          "via": "GET /api/integrations/health",
+          "call": "https://us.posthog.com/api/projects/{project}/insights/ (POSTHOG_HOST overrides host, line 342)",
+          "evidence": "solo-empire@981a12db:infra/scripts/sync/integration_health.py:373",
+          "credential_refs": [
+            "POSTHOG_API_KEY"
+          ]
+        }
+      ],
+      "directions": [
+        "outbound"
+      ],
+      "discovery_source": null,
+      "ai_provider": null
+    },
+    {
+      "provider": "slack",
+      "name": "Slack",
+      "direction": "outbound-read-only",
+      "routes": [
+        "GET /api/integrations/slack/channels"
+      ],
+      "lifecycle": "archived",
+      "auth_class": "bearer",
+      "signature": {
+        "scheme": "not-applicable (no inbound provider delivery)",
+        "header": "not-applicable",
+        "verification_location": "not-applicable",
+        "gateway_verification": "bearer only"
+      },
+      "idempotency": {
+        "key_source": "not-applicable (read-only GET)",
+        "gaps": []
+      },
+      "replay_window": {
+        "status": "not-applicable",
+        "detail": "read-only GET"
+      },
+      "privacy_class": "internal",
+      "privacy_class_basis": "proposed",
+      "privacy_evidence": "public non-archived channel summaries; no messages",
+      "evidence": [
+        "architecture-docs@a9c84727:systems/architecture/solo-empire-api-contract-v1.md:124",
+        "solo-empire@981a12db:integrations/EXTERNAL-APP-REGISTRY.md:65-69",
+        "solo-empire@981a12db:infra/scripts/sync/integration_health.py:387-423"
+      ],
+      "health_check": "check_slack",
+      "health_status": "active",
+      "credential_refs": [
+        "SLACK_BOT_TOKEN"
+      ],
+      "outbound_calls": [
+        {
+          "via": "GET /api/integrations/health",
+          "call": "https://slack.com/api/auth.test",
+          "evidence": "solo-empire@981a12db:infra/scripts/sync/integration_health.py:403",
+          "credential_refs": [
+            "SLACK_BOT_TOKEN"
+          ]
+        }
+      ],
+      "directions": [
+        "outbound"
+      ],
+      "discovery_source": null,
+      "ai_provider": null
+    },
+    {
+      "provider": "notion",
+      "name": "Notion",
+      "direction": "outbound-read-only",
+      "routes": [
+        "GET /api/integrations/notion/search"
+      ],
+      "lifecycle": "archived",
+      "auth_class": "bearer",
+      "signature": {
+        "scheme": "not-applicable (no inbound provider delivery)",
+        "header": "not-applicable",
+        "verification_location": "not-applicable",
+        "gateway_verification": "bearer only"
+      },
+      "idempotency": {
+        "key_source": "not-applicable (read-only GET)",
+        "gaps": []
+      },
+      "replay_window": {
+        "status": "not-applicable",
+        "detail": "read-only GET"
+      },
+      "privacy_class": "private",
+      "privacy_class_basis": "proposed",
+      "privacy_evidence": "page/data-source titles from a personal workspace; block content and user details dropped",
+      "evidence": [
+        "architecture-docs@a9c84727:systems/architecture/solo-empire-api-contract-v1.md:125",
+        "solo-empire@981a12db:integrations/EXTERNAL-APP-REGISTRY.md:71-76",
+        "solo-empire@981a12db:infra/scripts/sync/integration_health.py:425-461"
+      ],
+      "health_check": "check_notion",
+      "health_status": "active",
+      "credential_refs": [
+        "NOTION_BOT_TOKEN"
+      ],
+      "outbound_calls": [
+        {
+          "via": "GET /api/integrations/health",
+          "call": "https://api.notion.com/v1/search",
+          "evidence": "solo-empire@981a12db:infra/scripts/sync/integration_health.py:441",
+          "credential_refs": [
+            "NOTION_BOT_TOKEN"
+          ]
+        }
+      ],
+      "directions": [
+        "outbound"
+      ],
+      "discovery_source": null,
+      "ai_provider": null
+    },
+    {
+      "provider": "asana",
+      "name": "Asana",
+      "direction": "outbound-read-only",
+      "routes": [
+        "GET /api/integrations/asana/workspaces",
+        "GET /api/integrations/asana/projects"
+      ],
+      "lifecycle": "archived",
+      "auth_class": "bearer",
+      "signature": {
+        "scheme": "not-applicable (no inbound provider delivery)",
+        "header": "not-applicable",
+        "verification_location": "not-applicable",
+        "gateway_verification": "bearer only"
+      },
+      "idempotency": {
+        "key_source": "not-applicable (read-only GET)",
+        "gaps": []
+      },
+      "replay_window": {
+        "status": "not-applicable",
+        "detail": "read-only GET"
+      },
+      "privacy_class": "internal",
+      "privacy_class_basis": "proposed",
+      "privacy_evidence": "workspace and compact project metadata; no task content",
+      "evidence": [
+        "architecture-docs@a9c84727:systems/architecture/solo-empire-api-contract-v1.md:126-127",
+        "solo-empire@981a12db:integrations/EXTERNAL-APP-REGISTRY.md:78-83",
+        "solo-empire@981a12db:infra/scripts/sync/integration_health.py:463-498"
+      ],
+      "health_check": "check_asana",
+      "health_status": "active",
+      "credential_refs": [
+        "ASANA_PERSONAL_ACCESS_TOKEN"
+      ],
+      "outbound_calls": [
+        {
+          "via": "GET /api/integrations/health",
+          "call": "https://app.asana.com/api/1.0/workspaces",
+          "evidence": "solo-empire@981a12db:infra/scripts/sync/integration_health.py:480",
+          "credential_refs": [
+            "ASANA_PERSONAL_ACCESS_TOKEN"
+          ]
+        }
+      ],
+      "directions": [
+        "outbound"
+      ],
+      "discovery_source": null,
+      "ai_provider": null
+    },
+    {
+      "provider": "linear",
+      "name": "Linear",
+      "direction": "outbound-read-only",
+      "routes": [
+        "GET /api/integrations/linear/teams",
+        "GET /api/integrations/linear/projects"
+      ],
+      "lifecycle": "archived",
+      "auth_class": "bearer",
+      "signature": {
+        "scheme": "not-applicable (no inbound provider delivery)",
+        "header": "not-applicable",
+        "verification_location": "not-applicable",
+        "gateway_verification": "bearer only"
+      },
+      "idempotency": {
+        "key_source": "not-applicable (read-only GET)",
+        "gaps": []
+      },
+      "replay_window": {
+        "status": "not-applicable",
+        "detail": "read-only GET"
+      },
+      "privacy_class": "internal",
+      "privacy_class_basis": "proposed",
+      "privacy_evidence": "team and project metadata",
+      "evidence": [
+        "architecture-docs@a9c84727:systems/architecture/solo-empire-api-contract-v1.md:128-129",
+        "solo-empire@981a12db:infra/scripts/sync/integration_health.py:500-540"
+      ],
+      "health_check": "check_linear",
+      "health_status": "active",
+      "credential_refs": [
+        "LINEAR_API_KEY"
+      ],
+      "outbound_calls": [
+        {
+          "via": "GET /api/integrations/health",
+          "call": "https://api.linear.app/graphql",
+          "evidence": "solo-empire@981a12db:infra/scripts/sync/integration_health.py:516",
+          "credential_refs": [
+            "LINEAR_API_KEY"
+          ]
+        }
+      ],
+      "directions": [
+        "outbound"
+      ],
+      "discovery_source": null,
+      "ai_provider": null
+    },
+    {
+      "provider": "discord",
+      "name": "Discord",
+      "direction": "outbound-read-only",
+      "routes": [
+        "GET /api/integrations/discord/guilds"
+      ],
+      "lifecycle": "archived",
+      "auth_class": "bearer",
+      "signature": {
+        "scheme": "not-applicable (no inbound provider delivery)",
+        "header": "not-applicable",
+        "verification_location": "not-applicable",
+        "gateway_verification": "bearer only"
+      },
+      "idempotency": {
+        "key_source": "not-applicable (read-only GET)",
+        "gaps": []
+      },
+      "replay_window": {
+        "status": "not-applicable",
+        "detail": "read-only GET"
+      },
+      "privacy_class": "internal",
+      "privacy_class_basis": "proposed",
+      "privacy_evidence": "partial guild metadata; messages and members disabled",
+      "evidence": [
+        "architecture-docs@a9c84727:systems/architecture/solo-empire-api-contract-v1.md:130",
+        "solo-empire@981a12db:integrations/EXTERNAL-APP-REGISTRY.md:85-88",
+        "solo-empire@981a12db:integrations/discord/README.md",
+        "solo-empire@981a12db:infra/scripts/sync/integration_health.py:542-580"
+      ],
+      "health_check": "check_discord",
+      "health_status": "active",
+      "credential_refs": [
+        "DISCORD_BOT_TOKEN"
+      ],
+      "outbound_calls": [
+        {
+          "via": "GET /api/integrations/health",
+          "call": "https://discord.com/api/v10/users/@me",
+          "evidence": "solo-empire@981a12db:infra/scripts/sync/integration_health.py:561",
+          "credential_refs": [
+            "DISCORD_BOT_TOKEN"
+          ]
+        }
+      ],
+      "directions": [
+        "outbound"
+      ],
+      "discovery_source": null,
+      "ai_provider": null
+    },
+    {
+      "provider": "whatsapp-business",
+      "name": "WhatsApp Business Cloud API",
+      "direction": "outbound-read-only",
+      "routes": [
+        "GET /api/integrations/whatsapp-business/phone-numbers"
+      ],
+      "lifecycle": "archived",
+      "auth_class": "bearer",
+      "signature": {
+        "scheme": "not-applicable (no inbound provider delivery)",
+        "header": "not-applicable",
+        "verification_location": "not-applicable",
+        "gateway_verification": "bearer only"
+      },
+      "idempotency": {
+        "key_source": "not-applicable (read-only GET)",
+        "gaps": []
+      },
+      "replay_window": {
+        "status": "not-applicable",
+        "detail": "read-only GET"
+      },
+      "privacy_class": "private",
+      "privacy_class_basis": "proposed",
+      "privacy_evidence": "business phone-number metadata, masked before return",
+      "evidence": [
+        "architecture-docs@a9c84727:systems/architecture/solo-empire-api-contract-v1.md:131",
+        "solo-empire@981a12db:integrations/EXTERNAL-APP-REGISTRY.md:90-94",
+        "solo-empire@981a12db:integrations/whatsapp-business/README.md",
+        "solo-empire@981a12db:infra/scripts/sync/integration_health.py:582-629"
+      ],
+      "health_check": "check_whatsapp_business",
+      "health_status": "active",
+      "credential_refs": [
+        "WHATSAPP_CLOUD_API_TOKEN",
+        "WHATSAPP_BUSINESS_ACCOUNT_ID"
+      ],
+      "outbound_calls": [
+        {
+          "via": "GET /api/integrations/health",
+          "call": "https://graph.facebook.com/{version}/{waba_id}",
+          "evidence": "solo-empire@981a12db:infra/scripts/sync/integration_health.py:610",
+          "credential_refs": [
+            "WHATSAPP_CLOUD_API_TOKEN"
+          ]
+        }
+      ],
+      "directions": [
+        "outbound"
+      ],
+      "discovery_source": null,
+      "ai_provider": null
+    },
+    {
+      "provider": "microsoft-graph",
+      "name": "Microsoft Graph",
+      "direction": "outbound-read-only",
+      "routes": [
+        "GET /api/integrations/microsoft-graph/me"
+      ],
+      "lifecycle": "archived",
+      "auth_class": "bearer",
+      "signature": {
+        "scheme": "not-applicable (no inbound provider delivery)",
+        "header": "not-applicable",
+        "verification_location": "not-applicable",
+        "gateway_verification": "bearer only"
+      },
+      "idempotency": {
+        "key_source": "not-applicable (read-only GET)",
+        "gaps": []
+      },
+      "replay_window": {
+        "status": "not-applicable",
+        "detail": "read-only GET"
+      },
+      "privacy_class": "private",
+      "privacy_class_basis": "proposed",
+      "privacy_evidence": "signed-in user id and displayName only",
+      "evidence": [
+        "architecture-docs@a9c84727:systems/architecture/solo-empire-api-contract-v1.md:132",
+        "solo-empire@981a12db:integrations/EXTERNAL-APP-REGISTRY.md:96-99",
+        "solo-empire@981a12db:integrations/microsoft-graph/README.md",
+        "solo-empire@981a12db:infra/scripts/sync/integration_health.py:631-667"
+      ],
+      "health_check": "check_microsoft_graph",
+      "health_status": "active",
+      "credential_refs": [
+        "MICROSOFT_GRAPH_ACCESS_TOKEN"
+      ],
+      "outbound_calls": [
+        {
+          "via": "GET /api/integrations/health",
+          "call": "https://graph.microsoft.com/v1.0/me",
+          "evidence": "solo-empire@981a12db:infra/scripts/sync/integration_health.py:648",
+          "credential_refs": [
+            "MICROSOFT_GRAPH_ACCESS_TOKEN"
+          ]
+        }
+      ],
+      "directions": [
+        "outbound"
+      ],
+      "discovery_source": null,
+      "ai_provider": null
+    },
+    {
+      "provider": "zoom",
+      "name": "Zoom",
+      "direction": "outbound-read-only",
+      "routes": [
+        "GET /api/integrations/zoom/me"
+      ],
+      "lifecycle": "archived",
+      "auth_class": "bearer",
+      "signature": {
+        "scheme": "not-applicable (no inbound provider delivery)",
+        "header": "not-applicable",
+        "verification_location": "not-applicable",
+        "gateway_verification": "bearer only"
+      },
+      "idempotency": {
+        "key_source": "not-applicable (read-only GET)",
+        "gaps": []
+      },
+      "replay_window": {
+        "status": "not-applicable",
+        "detail": "read-only GET"
+      },
+      "privacy_class": "private",
+      "privacy_class_basis": "proposed",
+      "privacy_evidence": "user id, display_name and status only",
+      "evidence": [
+        "architecture-docs@a9c84727:systems/architecture/solo-empire-api-contract-v1.md:133",
+        "solo-empire@981a12db:integrations/EXTERNAL-APP-REGISTRY.md:101-104",
+        "solo-empire@981a12db:integrations/zoom/README.md",
+        "solo-empire@981a12db:infra/scripts/sync/integration_health.py:669-707"
+      ],
+      "health_check": "check_zoom",
+      "health_status": "active",
+      "credential_refs": [
+        "ZOOM_ACCESS_TOKEN"
+      ],
+      "outbound_calls": [
+        {
+          "via": "GET /api/integrations/health",
+          "call": "https://api.zoom.us/v2/users/me",
+          "evidence": "solo-empire@981a12db:infra/scripts/sync/integration_health.py:688",
+          "credential_refs": [
+            "ZOOM_ACCESS_TOKEN"
+          ]
+        }
+      ],
+      "directions": [
+        "outbound"
+      ],
+      "discovery_source": null,
+      "ai_provider": null
+    },
+    {
+      "provider": "monday",
+      "name": "monday.com",
+      "direction": "outbound-read-only",
+      "routes": [
+        "GET /api/integrations/monday/boards"
+      ],
+      "lifecycle": "archived",
+      "auth_class": "bearer",
+      "signature": {
+        "scheme": "not-applicable (no inbound provider delivery)",
+        "header": "not-applicable",
+        "verification_location": "not-applicable",
+        "gateway_verification": "bearer only"
+      },
+      "idempotency": {
+        "key_source": "not-applicable (read-only GET)",
+        "gaps": []
+      },
+      "replay_window": {
+        "status": "not-applicable",
+        "detail": "read-only GET"
+      },
+      "privacy_class": "internal",
+      "privacy_class_basis": "proposed",
+      "privacy_evidence": "board id, name and state only",
+      "evidence": [
+        "architecture-docs@a9c84727:systems/architecture/solo-empire-api-contract-v1.md:134",
+        "solo-empire@981a12db:integrations/EXTERNAL-APP-REGISTRY.md:106-109",
+        "solo-empire@981a12db:integrations/monday/README.md",
+        "solo-empire@981a12db:infra/scripts/sync/integration_health.py:709-752"
+      ],
+      "health_check": "check_monday",
+      "health_status": "active",
+      "credential_refs": [
+        "MONDAY_API_TOKEN"
+      ],
+      "outbound_calls": [
+        {
+          "via": "GET /api/integrations/health",
+          "call": "https://api.monday.com/v2",
+          "evidence": "solo-empire@981a12db:infra/scripts/sync/integration_health.py:730",
+          "credential_refs": [
+            "MONDAY_API_TOKEN"
+          ]
+        }
+      ],
+      "directions": [
+        "outbound"
+      ],
+      "discovery_source": null,
+      "ai_provider": null
+    },
+    {
+      "provider": "google-calendar",
+      "name": "Google Calendar (local setup script)",
+      "direction": "outbound-read-only",
+      "routes": [],
+      "lifecycle": "removed",
+      "auth_class": "local-oauth",
+      "signature": {
+        "scheme": "not-applicable (outbound OAuth read; no inbound delivery)",
+        "header": "not-applicable",
+        "verification_location": "not-applicable",
+        "gateway_verification": "not-applicable"
+      },
+      "idempotency": {
+        "key_source": "not-applicable (read-only probe)",
+        "gaps": []
+      },
+      "replay_window": {
+        "status": "not-applicable",
+        "detail": "read-only probe"
+      },
+      "privacy_class": "private",
+      "privacy_class_basis": "proposed",
+      "privacy_evidence": "personal calendar data",
+      "evidence": [
+        "solo-empire@981a12db:integrations/google/setup_calendar.py",
+        "solo-empire@981a12db:integrations/google/README.md",
+        "solo-empire@981a12db:infra/scripts/sync/integration_health.py:60-94"
+      ],
+      "health_check": "check_google_calendar",
+      "health_status": "active",
+      "credential_refs": [
+        "GOOGLE_CLIENT_ID",
+        "GOOGLE_CLIENT_SECRET",
+        "GOOGLE_REFRESH_TOKEN"
+      ],
+      "outbound_calls": [
+        {
+          "via": "GET /api/integrations/health",
+          "call": "https://www.googleapis.com/calendar/v3/calendars/primary",
+          "evidence": "solo-empire@981a12db:infra/scripts/sync/integration_health.py:82",
+          "credential_refs": [
+            "GOOGLE_CLIENT_ID",
+            "GOOGLE_CLIENT_SECRET",
+            "GOOGLE_REFRESH_TOKEN"
+          ]
+        }
+      ],
+      "directions": [
+        "outbound",
+        "local"
+      ],
+      "discovery_source": null,
+      "ai_provider": null
+    },
+    {
+      "provider": "brave-bookmarks",
+      "name": "Brave Bookmarks (local lake-first pipeline)",
+      "direction": "local-script",
+      "routes": [],
+      "lifecycle": "removed",
+      "auth_class": "local-file",
+      "signature": {
+        "scheme": "not-applicable (no HTTP route)",
+        "header": "not-applicable",
+        "verification_location": "not-applicable",
+        "gateway_verification": "not-applicable"
+      },
+      "idempotency": {
+        "key_source": "not-applicable (no HTTP route)",
+        "gaps": []
+      },
+      "replay_window": {
+        "status": "not-applicable",
+        "detail": "no HTTP route"
+      },
+      "privacy_class": "private",
+      "privacy_class_basis": "proposed",
+      "privacy_evidence": "personal browsing bookmarks",
+      "evidence": [
+        "solo-empire@981a12db:integrations/brave-bookmarks/README.md",
+        "solo-empire@981a12db:integrations/README.md:71"
+      ],
+      "health_check": null,
+      "health_status": null,
+      "credential_refs": [],
+      "outbound_calls": [],
+      "directions": [
+        "local"
+      ],
+      "discovery_source": null,
+      "ai_provider": null
+    },
+    {
+      "provider": "gmail",
+      "name": "Gmail API",
+      "direction": "outbound-read-only",
+      "directions": [
+        "outbound"
+      ],
+      "routes": [],
+      "lifecycle": "archived",
+      "auth_class": "outbound-credential",
+      "signature": {
+        "scheme": "not-applicable (outbound only; no inbound provider delivery)",
+        "header": "not-applicable",
+        "verification_location": "not-applicable",
+        "gateway_verification": "not-applicable (no gateway route; reached only via Bearer GET /api/integrations/health)"
+      },
+      "idempotency": {
+        "key_source": "not-applicable (read-only probe)",
+        "gaps": []
+      },
+      "replay_window": {
+        "status": "not-applicable",
+        "detail": "read-only outbound call"
+      },
+      "privacy_class": "restricted",
+      "privacy_class_basis": "proposed",
+      "privacy_evidence": "personal mailbox; the historical pipeline read message metadata",
+      "evidence": [
+        "solo-empire@981a12db:infra/scripts/sync/integration_health.py:96-115",
+        "solo-empire@981a12db:integrations/README.md:34-35",
+        "solo-empire@981a12db:infra/scripts/utils/_env.py:160-165"
+      ],
+      "health_check": "check_gmail",
+      "health_status": "active",
+      "credential_refs": [
+        "GOOGLE_CLIENT_ID",
+        "GOOGLE_CLIENT_SECRET",
+        "GOOGLE_REFRESH_TOKEN"
+      ],
+      "outbound_calls": [
+        {
+          "via": "GET /api/integrations/health",
+          "call": "https://gmail.googleapis.com/gmail/v1/users/me/labels",
+          "evidence": "solo-empire@981a12db:infra/scripts/sync/integration_health.py:103",
+          "credential_refs": [
+            "GOOGLE_CLIENT_ID",
+            "GOOGLE_CLIENT_SECRET",
+            "GOOGLE_REFRESH_TOKEN"
+          ]
+        }
+      ],
+      "discovery_source": null,
+      "ai_provider": null
+    },
+    {
+      "provider": "google-drive",
+      "name": "Google Drive API",
+      "direction": "outbound-read-only",
+      "directions": [
+        "outbound"
+      ],
+      "routes": [],
+      "lifecycle": "archived",
+      "auth_class": "outbound-credential",
+      "signature": {
+        "scheme": "not-applicable (outbound only; no inbound provider delivery)",
+        "header": "not-applicable",
+        "verification_location": "not-applicable",
+        "gateway_verification": "not-applicable (no gateway route; reached only via Bearer GET /api/integrations/health)"
+      },
+      "idempotency": {
+        "key_source": "not-applicable (read-only probe)",
+        "gaps": []
+      },
+      "replay_window": {
+        "status": "not-applicable",
+        "detail": "read-only outbound call"
+      },
+      "privacy_class": "private",
+      "privacy_class_basis": "proposed",
+      "privacy_evidence": "personal drive metadata",
+      "evidence": [
+        "solo-empire@981a12db:infra/scripts/sync/integration_health.py:117-136",
+        "solo-empire@981a12db:infra/scripts/utils/_env.py:160-165"
+      ],
+      "health_check": "check_google_drive",
+      "health_status": "active",
+      "credential_refs": [
+        "GOOGLE_CLIENT_ID",
+        "GOOGLE_CLIENT_SECRET",
+        "GOOGLE_REFRESH_TOKEN"
+      ],
+      "outbound_calls": [
+        {
+          "via": "GET /api/integrations/health",
+          "call": "https://www.googleapis.com/drive/v3/files",
+          "evidence": "solo-empire@981a12db:infra/scripts/sync/integration_health.py:124",
+          "credential_refs": [
+            "GOOGLE_CLIENT_ID",
+            "GOOGLE_CLIENT_SECRET",
+            "GOOGLE_REFRESH_TOKEN"
+          ]
+        }
+      ],
+      "discovery_source": null,
+      "ai_provider": null
+    },
+    {
+      "provider": "github",
+      "name": "GitHub API",
+      "direction": "outbound-read-only",
+      "directions": [
+        "outbound"
+      ],
+      "routes": [],
+      "lifecycle": "archived",
+      "auth_class": "outbound-credential",
+      "signature": {
+        "scheme": "not-applicable (outbound only; no inbound provider delivery)",
+        "header": "not-applicable",
+        "verification_location": "not-applicable",
+        "gateway_verification": "not-applicable (no gateway route; reached only via Bearer GET /api/integrations/health)"
+      },
+      "idempotency": {
+        "key_source": "not-applicable (read-only probe)",
+        "gaps": []
+      },
+      "replay_window": {
+        "status": "not-applicable",
+        "detail": "read-only outbound call"
+      },
+      "privacy_class": "internal",
+      "privacy_class_basis": "proposed",
+      "privacy_evidence": "identity probe only; no repository contents",
+      "evidence": [
+        "solo-empire@981a12db:infra/scripts/sync/integration_health.py:138-160"
+      ],
+      "health_check": "check_github",
+      "health_status": "active",
+      "credential_refs": [
+        "GITHUB_PERSONAL_ACCESS_TOKEN"
+      ],
+      "outbound_calls": [
+        {
+          "via": "GET /api/integrations/health",
+          "call": "https://api.github.com/user",
+          "evidence": "solo-empire@981a12db:infra/scripts/sync/integration_health.py:148",
+          "credential_refs": [
+            "GITHUB_PERSONAL_ACCESS_TOKEN"
+          ]
+        }
+      ],
+      "discovery_source": null,
+      "ai_provider": null
+    },
+    {
+      "provider": "cloudflare",
+      "name": "Cloudflare API",
+      "direction": "outbound-read-only",
+      "directions": [
+        "outbound"
+      ],
+      "routes": [],
+      "lifecycle": "archived",
+      "auth_class": "outbound-credential",
+      "signature": {
+        "scheme": "not-applicable (outbound only; no inbound provider delivery)",
+        "header": "not-applicable",
+        "verification_location": "not-applicable",
+        "gateway_verification": "not-applicable (no gateway route; reached only via Bearer GET /api/integrations/health)"
+      },
+      "idempotency": {
+        "key_source": "not-applicable (read-only probe)",
+        "gaps": []
+      },
+      "replay_window": {
+        "status": "not-applicable",
+        "detail": "read-only outbound call"
+      },
+      "privacy_class": "internal",
+      "privacy_class_basis": "proposed",
+      "privacy_evidence": "token verification only",
+      "evidence": [
+        "solo-empire@981a12db:infra/scripts/sync/integration_health.py:162-181",
+        "solo-empire@981a12db:infra/scripts/utils/_env.py:177-179"
+      ],
+      "health_check": "check_cloudflare",
+      "health_status": "active",
+      "credential_refs": [
+        "CLOUDFLARE_API_TOKEN"
+      ],
+      "outbound_calls": [
+        {
+          "via": "GET /api/integrations/health",
+          "call": "https://api.cloudflare.com/client/v4/user/tokens/verify",
+          "evidence": "solo-empire@981a12db:infra/scripts/sync/integration_health.py:172",
+          "credential_refs": [
+            "CLOUDFLARE_API_TOKEN"
+          ]
+        }
+      ],
+      "discovery_source": null,
+      "ai_provider": null
+    },
+    {
+      "provider": "vercel",
+      "name": "Vercel API",
+      "direction": "outbound-read-only",
+      "directions": [
+        "outbound"
+      ],
+      "routes": [],
+      "lifecycle": "archived",
+      "auth_class": "outbound-credential",
+      "signature": {
+        "scheme": "not-applicable (outbound only; no inbound provider delivery)",
+        "header": "not-applicable",
+        "verification_location": "not-applicable",
+        "gateway_verification": "not-applicable (no gateway route; reached only via Bearer GET /api/integrations/health)"
+      },
+      "idempotency": {
+        "key_source": "not-applicable (read-only probe)",
+        "gaps": []
+      },
+      "replay_window": {
+        "status": "not-applicable",
+        "detail": "read-only outbound call"
+      },
+      "privacy_class": "internal",
+      "privacy_class_basis": "proposed",
+      "privacy_evidence": "project list metadata",
+      "evidence": [
+        "solo-empire@981a12db:infra/scripts/sync/integration_health.py:183-202",
+        "solo-empire@981a12db:infra/scripts/platform/paas_health.py:140-144"
+      ],
+      "health_check": "check_vercel",
+      "health_status": "active",
+      "credential_refs": [
+        "VERCEL_TOKEN",
+        "VERCEL_TEAM_ID"
+      ],
+      "outbound_calls": [
+        {
+          "via": "GET /api/integrations/health",
+          "call": "https://api.vercel.com/v9/projects?limit=1",
+          "evidence": "solo-empire@981a12db:infra/scripts/sync/integration_health.py:193",
+          "credential_refs": [
+            "VERCEL_TOKEN"
+          ]
+        }
+      ],
+      "discovery_source": null,
+      "ai_provider": null
+    },
+    {
+      "provider": "render",
+      "name": "Render API",
+      "direction": "outbound-read-only",
+      "directions": [
+        "outbound"
+      ],
+      "routes": [],
+      "lifecycle": "archived",
+      "auth_class": "outbound-credential",
+      "signature": {
+        "scheme": "not-applicable (outbound only; no inbound provider delivery)",
+        "header": "not-applicable",
+        "verification_location": "not-applicable",
+        "gateway_verification": "not-applicable (no gateway route; reached only via Bearer GET /api/integrations/health)"
+      },
+      "idempotency": {
+        "key_source": "not-applicable (read-only probe)",
+        "gaps": []
+      },
+      "replay_window": {
+        "status": "not-applicable",
+        "detail": "read-only outbound call"
+      },
+      "privacy_class": "internal",
+      "privacy_class_basis": "proposed",
+      "privacy_evidence": "service metadata",
+      "evidence": [
+        "solo-empire@981a12db:infra/scripts/sync/integration_health.py:204-206",
+        "solo-empire@981a12db:infra/scripts/platform/paas_health.py:174",
+        "solo-empire@981a12db:infra/platform/cloud-providers.yaml:147-150"
+      ],
+      "health_check": "check_render",
+      "health_status": "active",
+      "credential_refs": [
+        "RENDER_API_KEY"
+      ],
+      "outbound_calls": [
+        {
+          "via": "GET /api/integrations/health",
+          "call": "https://api.render.com/v1/services?limit=1",
+          "evidence": "solo-empire@981a12db:infra/scripts/platform/paas_health.py:174",
+          "credential_refs": [
+            "RENDER_API_KEY"
+          ]
+        }
+      ],
+      "discovery_source": null,
+      "ai_provider": null
+    },
+    {
+      "provider": "railway",
+      "name": "Railway GraphQL API",
+      "direction": "outbound-read-only",
+      "directions": [
+        "outbound"
+      ],
+      "routes": [],
+      "lifecycle": "archived",
+      "auth_class": "outbound-credential",
+      "signature": {
+        "scheme": "not-applicable (outbound only; no inbound provider delivery)",
+        "header": "not-applicable",
+        "verification_location": "not-applicable",
+        "gateway_verification": "not-applicable (no gateway route; reached only via Bearer GET /api/integrations/health)"
+      },
+      "idempotency": {
+        "key_source": "not-applicable (read-only probe)",
+        "gaps": []
+      },
+      "replay_window": {
+        "status": "not-applicable",
+        "detail": "read-only outbound call"
+      },
+      "privacy_class": "internal",
+      "privacy_class_basis": "proposed",
+      "privacy_evidence": "account metadata",
+      "evidence": [
+        "solo-empire@981a12db:infra/scripts/sync/integration_health.py:209-211",
+        "solo-empire@981a12db:infra/scripts/platform/paas_health.py:201",
+        "solo-empire@981a12db:infra/platform/cloud-providers.yaml:190-193"
+      ],
+      "health_check": "check_railway",
+      "health_status": "active",
+      "credential_refs": [
+        "RAILWAY_TOKEN",
+        "RAILWAY_API_TOKEN"
+      ],
+      "outbound_calls": [
+        {
+          "via": "GET /api/integrations/health",
+          "call": "https://backboard.railway.com/graphql/v2",
+          "evidence": "solo-empire@981a12db:infra/scripts/platform/paas_health.py:201",
+          "credential_refs": [
+            "RAILWAY_TOKEN",
+            "RAILWAY_API_TOKEN"
+          ]
+        }
+      ],
+      "discovery_source": null,
+      "ai_provider": null
+    },
+    {
+      "provider": "fly-io",
+      "name": "Fly.io Machines API",
+      "direction": "outbound-read-only",
+      "directions": [
+        "outbound"
+      ],
+      "routes": [],
+      "lifecycle": "archived",
+      "auth_class": "outbound-credential",
+      "signature": {
+        "scheme": "not-applicable (outbound only; no inbound provider delivery)",
+        "header": "not-applicable",
+        "verification_location": "not-applicable",
+        "gateway_verification": "not-applicable (no gateway route; reached only via Bearer GET /api/integrations/health)"
+      },
+      "idempotency": {
+        "key_source": "not-applicable (read-only probe)",
+        "gaps": []
+      },
+      "replay_window": {
+        "status": "not-applicable",
+        "detail": "read-only outbound call"
+      },
+      "privacy_class": "internal",
+      "privacy_class_basis": "proposed",
+      "privacy_evidence": "app list metadata",
+      "evidence": [
+        "solo-empire@981a12db:infra/scripts/sync/integration_health.py:214-216",
+        "solo-empire@981a12db:infra/scripts/platform/paas_health.py:227-233",
+        "solo-empire@981a12db:infra/platform/cloud-providers.yaml:229-232"
+      ],
+      "health_check": "check_fly_io",
+      "health_status": "active",
+      "credential_refs": [
+        "FLY_API_TOKEN",
+        "FLY_TOKEN",
+        "FLY_ORG_SLUG"
+      ],
+      "outbound_calls": [
+        {
+          "via": "GET /api/integrations/health",
+          "call": "https://api.machines.dev/v1/apps",
+          "evidence": "solo-empire@981a12db:infra/scripts/platform/paas_health.py:233",
+          "credential_refs": [
+            "FLY_API_TOKEN",
+            "FLY_TOKEN"
+          ]
+        }
+      ],
+      "discovery_source": null,
+      "ai_provider": null
+    },
+    {
+      "provider": "heroku",
+      "name": "Heroku Platform API",
+      "direction": "outbound-read-only",
+      "directions": [
+        "outbound"
+      ],
+      "routes": [],
+      "lifecycle": "archived",
+      "auth_class": "outbound-credential",
+      "signature": {
+        "scheme": "not-applicable (outbound only; no inbound provider delivery)",
+        "header": "not-applicable",
+        "verification_location": "not-applicable",
+        "gateway_verification": "not-applicable (no gateway route; reached only via Bearer GET /api/integrations/health)"
+      },
+      "idempotency": {
+        "key_source": "not-applicable (read-only probe)",
+        "gaps": []
+      },
+      "replay_window": {
+        "status": "not-applicable",
+        "detail": "read-only outbound call"
+      },
+      "privacy_class": "internal",
+      "privacy_class_basis": "proposed",
+      "privacy_evidence": "account metadata",
+      "evidence": [
+        "solo-empire@981a12db:infra/scripts/sync/integration_health.py:219-221",
+        "solo-empire@981a12db:infra/scripts/platform/paas_health.py:260",
+        "solo-empire@981a12db:infra/platform/cloud-providers.yaml:269-272"
+      ],
+      "health_check": "check_heroku",
+      "health_status": "active",
+      "credential_refs": [
+        "HEROKU_TOKEN",
+        "HEROKU_API_KEY"
+      ],
+      "outbound_calls": [
+        {
+          "via": "GET /api/integrations/health",
+          "call": "https://api.heroku.com/account",
+          "evidence": "solo-empire@981a12db:infra/scripts/platform/paas_health.py:260",
+          "credential_refs": [
+            "HEROKU_TOKEN",
+            "HEROKU_API_KEY"
+          ]
+        }
+      ],
+      "discovery_source": null,
+      "ai_provider": null
+    },
+    {
+      "provider": "telegram",
+      "name": "Telegram Bot API",
+      "direction": "outbound-read-only",
+      "directions": [
+        "outbound"
+      ],
+      "routes": [],
+      "lifecycle": "archived",
+      "auth_class": "outbound-credential",
+      "signature": {
+        "scheme": "not-applicable (outbound only; no inbound provider delivery)",
+        "header": "not-applicable",
+        "verification_location": "not-applicable",
+        "gateway_verification": "not-applicable (no gateway route; reached only via Bearer GET /api/integrations/health)"
+      },
+      "idempotency": {
+        "key_source": "not-applicable (read-only probe)",
+        "gaps": []
+      },
+      "replay_window": {
+        "status": "not-applicable",
+        "detail": "read-only outbound call"
+      },
+      "privacy_class": "internal",
+      "privacy_class_basis": "proposed",
+      "privacy_evidence": "bot identity (getMe) only; no inbound Telegram webhook route exists",
+      "evidence": [
+        "solo-empire@981a12db:infra/scripts/sync/integration_health.py:224-240"
+      ],
+      "health_check": "check_telegram",
+      "health_status": "active",
+      "credential_refs": [
+        "TELEGRAM_INFRA_BOT_TOKEN",
+        "TELEGRAM_BOT_TOKEN"
+      ],
+      "outbound_calls": [
+        {
+          "via": "GET /api/integrations/health",
+          "call": "https://api.telegram.org/bot<token>/getMe",
+          "evidence": "solo-empire@981a12db:infra/scripts/sync/integration_health.py:233",
+          "credential_refs": [
+            "TELEGRAM_INFRA_BOT_TOKEN",
+            "TELEGRAM_BOT_TOKEN"
+          ]
+        }
+      ],
+      "discovery_source": null,
+      "ai_provider": null
+    },
+    {
+      "provider": "leantime",
+      "name": "Leantime (MCP endpoint)",
+      "direction": "outbound-read-only",
+      "directions": [
+        "outbound"
+      ],
+      "routes": [],
+      "lifecycle": "archived",
+      "auth_class": "outbound-anonymous",
+      "signature": {
+        "scheme": "not-applicable (outbound only; no inbound provider delivery)",
+        "header": "not-applicable",
+        "verification_location": "not-applicable",
+        "gateway_verification": "not-applicable (no gateway route; reached only via Bearer GET /api/integrations/health)"
+      },
+      "idempotency": {
+        "key_source": "not-applicable (read-only JSON-RPC tools/call)",
+        "gaps": [
+          "probe sends no credential; endpoint auth is not visible in this source"
+        ]
+      },
+      "replay_window": {
+        "status": "not-applicable",
+        "detail": "read-only outbound call"
+      },
+      "privacy_class": "internal",
+      "privacy_class_basis": "proposed",
+      "privacy_evidence": "project tickets via MCP tools/call; probe asks for one ticket",
+      "evidence": [
+        "solo-empire@981a12db:infra/scripts/sync/integration_health.py:848-874"
+      ],
+      "health_check": "check_leantime",
+      "health_status": "active",
+      "credential_refs": [],
+      "outbound_calls": [
+        {
+          "via": "GET /api/integrations/health",
+          "call": "https://mcp.project.cocofriday.com/mcp",
+          "evidence": "solo-empire@981a12db:infra/scripts/sync/integration_health.py:851",
+          "credential_refs": []
+        }
+      ],
+      "discovery_source": null,
+      "ai_provider": null
+    },
+    {
+      "provider": "todoist",
+      "name": "Todoist API",
+      "direction": "outbound-read-only",
+      "directions": [
+        "outbound"
+      ],
+      "routes": [],
+      "lifecycle": "archived",
+      "auth_class": "outbound-credential",
+      "signature": {
+        "scheme": "not-applicable (outbound only; no inbound provider delivery)",
+        "header": "not-applicable",
+        "verification_location": "not-applicable",
+        "gateway_verification": "not-applicable (no gateway route; reached only via Bearer GET /api/integrations/health)"
+      },
+      "idempotency": {
+        "key_source": "not-applicable (read-only probe)",
+        "gaps": []
+      },
+      "replay_window": {
+        "status": "not-applicable",
+        "detail": "read-only outbound call"
+      },
+      "privacy_class": "private",
+      "privacy_class_basis": "proposed",
+      "privacy_evidence": "personal tasks and projects",
+      "evidence": [
+        "solo-empire@981a12db:infra/scripts/sync/integration_health.py:876-898",
+        "solo-empire@981a12db:integrations/README.md:92-96"
+      ],
+      "health_check": "check_todoist",
+      "health_status": "active",
+      "credential_refs": [
+        "TODOIST_API_TOKEN"
+      ],
+      "outbound_calls": [
+        {
+          "via": "GET /api/integrations/health",
+          "call": "https://api.todoist.com/api/v1/projects",
+          "evidence": "solo-empire@981a12db:infra/scripts/sync/integration_health.py:887",
+          "credential_refs": [
+            "TODOIST_API_TOKEN"
+          ]
+        }
+      ],
+      "discovery_source": null,
+      "ai_provider": null
+    },
+    {
+      "provider": "strava",
+      "name": "Strava API",
+      "direction": "outbound-read-only",
+      "directions": [
+        "outbound"
+      ],
+      "routes": [],
+      "lifecycle": "archived",
+      "auth_class": "outbound-credential",
+      "signature": {
+        "scheme": "not-applicable (outbound only; no inbound provider delivery)",
+        "header": "not-applicable",
+        "verification_location": "not-applicable",
+        "gateway_verification": "not-applicable (no gateway route; reached only via Bearer GET /api/integrations/health)"
+      },
+      "idempotency": {
+        "key_source": "not-applicable (read-only probe)",
+        "gaps": []
+      },
+      "replay_window": {
+        "status": "not-applicable",
+        "detail": "read-only outbound call"
+      },
+      "privacy_class": "restricted",
+      "privacy_class_basis": "proposed",
+      "privacy_evidence": "personal health/activity data; check intentionally paused",
+      "evidence": [
+        "solo-empire@981a12db:infra/scripts/sync/integration_health.py:900-922",
+        "solo-empire@981a12db:infra/scripts/sync/integration_health.py:1131-1133",
+        "solo-empire@981a12db:infra/scripts/utils/_env.py:192-194"
+      ],
+      "health_check": "check_strava",
+      "health_status": "paused",
+      "credential_refs": [
+        "STRAVA_ACCESS_TOKEN"
+      ],
+      "outbound_calls": [
+        {
+          "via": "GET /api/integrations/health",
+          "call": "https://www.strava.com/api/v3/athlete",
+          "evidence": "solo-empire@981a12db:infra/scripts/sync/integration_health.py:911",
+          "credential_refs": [
+            "STRAVA_ACCESS_TOKEN"
+          ]
+        }
+      ],
+      "discovery_source": null,
+      "ai_provider": null
+    },
+    {
+      "provider": "binance-th",
+      "name": "Binance TH API",
+      "direction": "outbound-read-only",
+      "directions": [
+        "outbound"
+      ],
+      "routes": [],
+      "lifecycle": "archived",
+      "auth_class": "outbound-credential",
+      "signature": {
+        "scheme": "not-applicable (outbound only; no inbound provider delivery)",
+        "header": "not-applicable",
+        "verification_location": "not-applicable",
+        "gateway_verification": "not-applicable (no gateway route; reached only via Bearer GET /api/integrations/health)"
+      },
+      "idempotency": {
+        "key_source": "not-applicable (read-only probe)",
+        "gaps": []
+      },
+      "replay_window": {
+        "status": "not-applicable",
+        "detail": "read-only outbound call"
+      },
+      "privacy_class": "restricted",
+      "privacy_class_basis": "proposed",
+      "privacy_evidence": "finance/exchange account credentials; check intentionally paused",
+      "evidence": [
+        "solo-empire@981a12db:infra/scripts/sync/integration_health.py:924-945",
+        "solo-empire@981a12db:infra/scripts/sync/integration_health.py:1131-1133",
+        "solo-empire@981a12db:infra/scripts/utils/_env.py:197-201"
+      ],
+      "health_check": "check_binance_th",
+      "health_status": "paused",
+      "credential_refs": [
+        "BINANCE_TH_API_KEY",
+        "BINANCE_TH_API_SECRET"
+      ],
+      "outbound_calls": [
+        {
+          "via": "GET /api/integrations/health",
+          "call": "https://api.binance.th/api/v3/ping",
+          "evidence": "solo-empire@981a12db:infra/scripts/sync/integration_health.py:936",
+          "credential_refs": [
+            "BINANCE_TH_API_KEY",
+            "BINANCE_TH_API_SECRET"
+          ]
+        }
+      ],
+      "discovery_source": null,
+      "ai_provider": null
+    },
+    {
+      "provider": "apis-guru",
+      "name": "APIs.guru directory",
+      "direction": "outbound-read-only",
+      "directions": [
+        "outbound"
+      ],
+      "routes": [],
+      "lifecycle": "archived",
+      "auth_class": "outbound-anonymous",
+      "signature": {
+        "scheme": "not-applicable (outbound only; no inbound provider delivery)",
+        "header": "not-applicable",
+        "verification_location": "not-applicable",
+        "gateway_verification": "not-applicable (no gateway route; reached only via Bearer GET /api/integrations/health)"
+      },
+      "idempotency": {
+        "key_source": "not-applicable (read-only probe)",
+        "gaps": []
+      },
+      "replay_window": {
+        "status": "not-applicable",
+        "detail": "read-only outbound call"
+      },
+      "privacy_class": "public",
+      "privacy_class_basis": "proposed",
+      "privacy_evidence": "public API directory listing",
+      "evidence": [
+        "solo-empire@981a12db:infra/scripts/sync/discover_external_apps.py:26",
+        "architecture-docs@a9c84727:systems/architecture/solo-empire-api-contract-v1.md:121"
+      ],
+      "health_check": null,
+      "health_status": null,
+      "credential_refs": [],
+      "outbound_calls": [
+        {
+          "via": "GET /api/integrations/discovery",
+          "call": "https://api.apis.guru/v2/list.json",
+          "evidence": "solo-empire@981a12db:infra/scripts/sync/discover_external_apps.py:26",
+          "credential_refs": []
+        }
+      ],
+      "discovery_source": "APIS_GURU_URL",
+      "ai_provider": null
+    },
+    {
+      "provider": "mcp-registry",
+      "name": "MCP Registry",
+      "direction": "outbound-read-only",
+      "directions": [
+        "outbound"
+      ],
+      "routes": [],
+      "lifecycle": "archived",
+      "auth_class": "outbound-anonymous",
+      "signature": {
+        "scheme": "not-applicable (outbound only; no inbound provider delivery)",
+        "header": "not-applicable",
+        "verification_location": "not-applicable",
+        "gateway_verification": "not-applicable (no gateway route; reached only via Bearer GET /api/integrations/health)"
+      },
+      "idempotency": {
+        "key_source": "not-applicable (read-only probe)",
+        "gaps": []
+      },
+      "replay_window": {
+        "status": "not-applicable",
+        "detail": "read-only outbound call"
+      },
+      "privacy_class": "public",
+      "privacy_class_basis": "proposed",
+      "privacy_evidence": "public MCP server registry",
+      "evidence": [
+        "solo-empire@981a12db:infra/scripts/sync/discover_external_apps.py:27",
+        "architecture-docs@a9c84727:systems/architecture/solo-empire-api-contract-v1.md:121"
+      ],
+      "health_check": null,
+      "health_status": null,
+      "credential_refs": [],
+      "outbound_calls": [
+        {
+          "via": "GET /api/integrations/discovery",
+          "call": "https://registry.modelcontextprotocol.io/v0.1/servers",
+          "evidence": "solo-empire@981a12db:infra/scripts/sync/discover_external_apps.py:27",
+          "credential_refs": []
+        }
+      ],
+      "discovery_source": "MCP_REGISTRY_URL",
+      "ai_provider": null
+    },
+    {
+      "provider": "ai-llm-openai-compatible",
+      "name": "LLM provider behind the AI gateway (AI_GATEWAY_PROVIDER=openai-compatible)",
+      "direction": "outbound-read-only",
+      "directions": [
+        "outbound"
+      ],
+      "routes": [],
+      "lifecycle": "archived",
+      "auth_class": "outbound-credential",
+      "signature": {
+        "scheme": "not-applicable (outbound only; no inbound provider delivery)",
+        "header": "not-applicable",
+        "verification_location": "not-applicable",
+        "gateway_verification": "not-applicable (no gateway route; reached only via Bearer GET /api/integrations/health)"
+      },
+      "idempotency": {
+        "key_source": "none (each generate call is a new run; no client idempotency key)",
+        "gaps": [
+          "retries of POST /api/ai/generate can incur duplicate provider spend"
+        ]
+      },
+      "replay_window": {
+        "status": "not-applicable",
+        "detail": "read-only outbound call"
+      },
+      "privacy_class": "private",
+      "privacy_class_basis": "proposed",
+      "privacy_evidence": "caller prompts and generated text cross to the provider; contract says prompt/response bodies are not recorded (contract:119)",
+      "evidence": [
+        "solo-empire@328b2537:infra/api/ai_gateway.ts:274-287",
+        "architecture-docs@a9c84727:systems/architecture/solo-empire-api-contract-v1.md:118-119"
+      ],
+      "health_check": null,
+      "health_status": null,
+      "credential_refs": [
+        "AI_GATEWAY_PROVIDER",
+        "AI_GATEWAY_BASE_URL",
+        "AI_GATEWAY_API_KEY"
+      ],
+      "outbound_calls": [
+        {
+          "via": "POST /api/ai/generate",
+          "call": "HTTPS AI_GATEWAY_BASE_URL (OpenAI-compatible chat API)",
+          "evidence": "solo-empire@328b2537:infra/api/ai_gateway.ts:274-287",
+          "credential_refs": [
+            "AI_GATEWAY_API_KEY"
+          ]
+        }
+      ],
+      "ai_provider": "openai-compatible",
+      "discovery_source": null
+    }
+  ],
+  "solo_empire_integrations_dirs": [
+    "brave-bookmarks",
+    "discord",
+    "google",
+    "line",
+    "microsoft-graph",
+    "monday",
+    "whatsapp-business",
+    "zoom"
+  ],
+  "integrations_dir_provider": {
+    "brave-bookmarks": "brave-bookmarks",
+    "discord": "discord",
+    "google": "google-calendar",
+    "line": "line",
+    "microsoft-graph": "microsoft-graph",
+    "monday": "monday",
+    "whatsapp-business": "whatsapp-business",
+    "zoom": "zoom"
+  },
+  "sources_snapshot": "fixtures/gates/webhook-provider-sources.json",
+  "internal_health_checks": {
+    "check_db_freshness": "reads internal cell freshness; no external provider"
+  },
+  "credential_reference_rule": "credential_refs hold environment/secret NAMES only, never values"
+}
