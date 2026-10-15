@@ -1,31 +1,38 @@
-"""BOO-147 gate: external provider / webhook map stays in step with the code.
+"""BOO-147 gate: external provider / webhook map stays in step with its sources.
 
-``fixtures/gates/webhook-provider-map.json`` maps every external provider and
-inbound webhook route named by the integrations contract
-(architecture-docs ``solo-empire-api-contract-v1.md#signed-and-authenticated-webhook-routes``)
-to its signature check, idempotency key, replay window and privacy class, and
-records how this gateway treats those routes today.
+``fixtures/gates/webhook-provider-map.json`` maps external providers and
+inbound webhook routes to direction, signature/auth mechanism, credential
+reference names, idempotency key, replay window and privacy class, and records
+how this gateway treats those routes today.
 
-The tests fail when:
+``fixtures/gates/webhook-provider-sources.json`` is a committed, pinned
+snapshot (commit, git blob, sha256 and verbatim lines) of the sources the map
+is derived from:
 
-- a route class or path literal in ``server.py`` or an interface in
-  ``contract.json`` is not mapped;
-- a contract webhook/provider route has no provider entry, or an entry lacks a
-  signature, idempotency, replay-window or privacy field;
-- the recorded gateway behaviour (no signed-webhook route class, signature and
-  ``Idempotency-Key`` headers not forwarded, bad bearer rejected) no longer
-  matches what the real gateway does with synthetic credentials.
+- the architecture-docs contract (auth classes, AI/integration routes, webhook
+  routes);
+- solo-empire ``integration_health.py`` (every ``check_*`` provider probe and
+  the active probe list behind ``GET /api/integrations/health``);
+- solo-empire ``discover_external_apps.py`` (``GET /api/integrations/discovery``
+  sources);
+- solo-empire ``ai_gateway.ts`` (``POST /api/ai/generate`` provider);
+- the solo-empire ``integrations/`` tree.
 
-When an architecture-docs checkout is present (``ARCHITECTURE_DOCS_ROOT`` or
-the Book Dev sibling path), the contract tables are also re-parsed so the
-vendored route list cannot drift from the contract; CI skips that check.
+"Every provider" is scoped to exactly those sources plus this gateway's own
+routes. The tests below fail, in CI and without any sibling checkout, when a
+route, probe, discovery source, AI provider or integrations directory in the
+snapshot is not mapped, or when an entry lacks a required field. With local
+checkouts (``ARCHITECTURE_DOCS_ROOT``, ``SOLO_EMPIRE_ROOT``) extra tests prove
+the snapshot still matches git byte-for-byte.
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
+import subprocess
 import sys
 import unittest
 from http.client import HTTPConnection
@@ -41,10 +48,13 @@ from book_api_gateway.server import FORWARD_HEADERS, PUBLIC, ROUTE_ACCESS, creat
 from test_gateway import RecordingUpstreamServer, start_server  # noqa: E402
 
 FIXTURE_PATH = ROOT / "fixtures" / "gates" / "webhook-provider-map.json"
+SOURCES_PATH = ROOT / "fixtures" / "gates" / "webhook-provider-sources.json"
+GATE_DOC = ROOT / "docs" / "gates" / "BOO-147-webhook-provider-map.md"
 SERVER_SOURCE = ROOT / "src" / "book_api_gateway" / "server.py"
 CONTRACT_SECTION = "### Signed and authenticated webhook routes"
 READ_ROUTES_SECTION = "### Authenticated AI and read-only integration routes"
 DEFAULT_ARCH_DOCS = ROOT.parents[3] / "bookchaowalit" / "private" / "architecture-docs"
+DEFAULT_SOLO_EMPIRE = ROOT.parents[8] if len(ROOT.parents) > 8 else None
 
 # Synthetic credentials only; nothing here is a real provider secret.
 GATEWAY_TOKEN = "boo147-synthetic-gateway-token"
@@ -54,12 +64,23 @@ SYNTHETIC_SIGNATURE_HEADERS = {
     "stripe-signature": "t=1700000000,v1=00000000000000000000000000000000000000000000000000000000000000ff",
 }
 DIRECTIONS = {"inbound-webhook", "outbound-read-only", "local-script"}
+DIRECTION_FLAGS = {"inbound", "outbound", "local"}
 WEBHOOK_AUTH_CLASSES = {"signed-webhook", "bearer"}
 REPLAY_STATUSES = {"enforced", "missing", "not-applicable"}
+CREDENTIAL_NAME = re.compile(r"[A-Z][A-Z0-9_]*")
+ROUTE_ROW = re.compile(r"\|\s*`(GET|POST)`\s*\|\s*`([^`]+)`")
 
 
 def load_fixture() -> dict:
     return json.loads(FIXTURE_PATH.read_text(encoding="utf-8"))
+
+
+def load_sources() -> dict:
+    return json.loads(SOURCES_PATH.read_text(encoding="utf-8"))
+
+
+def source(key: str) -> dict:
+    return next(entry for entry in load_sources()["sources"] if entry["key"] == key)
 
 
 def mapped_routes(fixture: dict) -> dict[str, dict]:
@@ -74,6 +95,31 @@ def _nonempty(value: object) -> bool:
     return isinstance(value, str) and bool(value.strip())
 
 
+def contract_rows(lines: dict[str, str], heading: str) -> list[str]:
+    """Route rows (``METHOD /path``) of one contract section from snapshot lines."""
+
+    ordered = [lines[key] for key in sorted(lines, key=int)]
+    rows: list[str] = []
+    inside = False
+    for line in ordered:
+        if line.startswith("#"):
+            inside = line.strip() == heading
+            continue
+        match = ROUTE_ROW.match(line)
+        if inside and match:
+            rows.append(f"{match.group(1)} {match.group(2)}")
+    return rows
+
+
+def health_probes() -> tuple[set[str], set[str]]:
+    """(all check_* functions, check_* called in the live probe list)."""
+
+    lines = source("integration_health")["lines"]
+    defined = {m.group(1) for line in lines.values() if (m := re.match(r"def (check_\w+)\(", line))}
+    active = {m.group(1) for line in lines.values() if (m := re.match(r"\s+(check_\w+)\(\),", line))}
+    return defined, active
+
+
 class FixtureCompletenessTests(unittest.TestCase):
     def setUp(self) -> None:
         self.fixture = load_fixture()
@@ -86,18 +132,26 @@ class FixtureCompletenessTests(unittest.TestCase):
         contract = self.fixture["contract"]
         self.assertEqual(contract["path"], "systems/architecture/solo-empire-api-contract-v1.md")
         self.assertEqual(contract["anchor"], "#signed-and-authenticated-webhook-routes")
+        self.assertEqual(contract["revision"], source("contract")["commit"])
 
     def test_provider_ids_are_unique(self) -> None:
         ids = [provider["provider"] for provider in self.fixture["providers"]]
         self.assertEqual(len(ids), len(set(ids)))
 
-    def test_every_provider_has_signature_idempotency_replay_and_privacy(self) -> None:
+    def test_every_provider_has_direction_auth_idempotency_replay_and_privacy(self) -> None:
         vocabulary = set(self.fixture["privacy_classes"])
         self.assertEqual(vocabulary, {"public", "internal", "private", "restricted"})
         for provider in self.fixture["providers"]:
             name = provider["provider"]
             with self.subTest(provider=name):
                 self.assertIn(provider["direction"], DIRECTIONS)
+                self.assertTrue(provider["directions"])
+                self.assertLessEqual(set(provider["directions"]), DIRECTION_FLAGS)
+                self.assertEqual("inbound" in provider["directions"], provider["direction"] == "inbound-webhook")
+                self.assertEqual(
+                    "outbound" in provider["directions"],
+                    provider["direction"] == "outbound-read-only" or bool(provider["outbound_calls"]),
+                )
                 self.assertTrue(_nonempty(provider["auth_class"]))
                 signature = provider["signature"]
                 for field in ("scheme", "header", "verification_location", "gateway_verification"):
@@ -115,6 +169,20 @@ class FixtureCompletenessTests(unittest.TestCase):
                 self.assertTrue(_nonempty(provider["privacy_evidence"]))
                 self.assertTrue(provider["evidence"], "evidence citations")
 
+    def test_outbound_calls_name_credentials_by_reference_only(self) -> None:
+        for provider in self.fixture["providers"]:
+            with self.subTest(provider=provider["provider"]):
+                self.assertIsInstance(provider["credential_refs"], list)
+                for name in provider["credential_refs"]:
+                    self.assertRegex(name, CREDENTIAL_NAME)
+                for call in provider["outbound_calls"]:
+                    self.assertTrue(_nonempty(call["via"]))
+                    self.assertTrue(_nonempty(call["call"]))
+                    self.assertTrue(_nonempty(call["evidence"]))
+                    self.assertLessEqual(set(call["credential_refs"]), set(provider["credential_refs"]))
+                if provider["direction"] == "outbound-read-only":
+                    self.assertTrue(provider["outbound_calls"] or provider["routes"])
+
     def test_inbound_webhooks_name_a_concrete_check_and_key(self) -> None:
         for provider in self.fixture["providers"]:
             if provider["direction"] != "inbound-webhook":
@@ -128,87 +196,212 @@ class FixtureCompletenessTests(unittest.TestCase):
                 self.assertNotIn("not-applicable", provider["idempotency"]["key_source"])
                 if provider["auth_class"] == "signed-webhook":
                     self.assertIn(signature["header"].lower(), SYNTHETIC_SIGNATURE_HEADERS)
-                    self.assertTrue(_nonempty(signature.get("secret_env")))
+                    self.assertIn(signature["secret_env"], provider["credential_refs"])
                     self.assertEqual(signature["gateway_verification"], "missing")
                     # A signed delivery carries third-party payloads; never below private.
                     self.assertIn(provider["privacy_class"], {"private", "restricted"})
 
-    def test_integrations_directories_are_all_mapped(self) -> None:
-        ids = {provider["provider"] for provider in self.fixture["providers"]}
-        dirs = self.fixture["solo_empire_integrations_dirs"]
-        self.assertEqual(sorted(dirs), sorted(self.fixture["integrations_dir_provider"]))
+    def test_finance_and_health_data_providers_are_restricted(self) -> None:
+        by_id = {provider["provider"]: provider for provider in self.fixture["providers"]}
+        for provider_id in ("binance-th", "stripe", "internal-revenue-push", "strava", "gmail"):
+            with self.subTest(provider=provider_id):
+                self.assertEqual(by_id[provider_id]["privacy_class"], "restricted")
+
+    def test_architecture_docs_citations_resolve_to_the_pinned_commit(self) -> None:
+        revision = self.fixture["contract"]["revision"]
+        texts = {
+            "fixture": FIXTURE_PATH.read_text(encoding="utf-8"),
+            "doc": GATE_DOC.read_text(encoding="utf-8"),
+        }
+        for label, text in texts.items():
+            shas = set(re.findall(r"architecture-docs@([0-9a-f]+)", text))
+            with self.subTest(document=label):
+                self.assertTrue(shas, "no architecture-docs citation found")
+                for sha in shas:
+                    self.assertTrue(revision.startswith(sha), f"architecture-docs@{sha} is not {revision}")
+
+
+class SourceSnapshotCoverageTests(unittest.TestCase):
+    """The map covers everything in the pinned source snapshot (runs in CI)."""
+
+    def setUp(self) -> None:
+        self.fixture = load_fixture()
+        self.providers = self.fixture["providers"]
+        self.routes = mapped_routes(self.fixture)
+
+    def test_snapshot_entries_are_well_formed(self) -> None:
+        sources = load_sources()
+        self.assertEqual(self.fixture["sources_snapshot"], "fixtures/gates/webhook-provider-sources.json")
+        keys = {entry["key"] for entry in sources["sources"]}
+        self.assertEqual(keys, {"contract", "integration_health", "discovery", "ai_gateway"})
+        for entry in sources["sources"]:
+            with self.subTest(source=entry["key"]):
+                self.assertRegex(entry["commit"], r"^[0-9a-f]{40}$")
+                self.assertRegex(entry["git_blob"], r"^[0-9a-f]{40}$")
+                self.assertRegex(entry["sha256"], r"^[0-9a-f]{64}$")
+                self.assertTrue(entry["lines"])
+
+    def test_contract_webhook_section_matches_snapshot(self) -> None:
+        rows = contract_rows(source("contract")["lines"], CONTRACT_SECTION)
+        self.assertEqual(rows, self.fixture["contract"]["webhook_routes"])
+        for route in rows:
+            with self.subTest(route=route):
+                self.assertIn(route, sorted(self.routes))
+                self.assertEqual(self.routes[route]["direction"], "inbound-webhook")
+
+    def test_every_contract_ai_and_integration_route_is_mapped(self) -> None:
+        rows = contract_rows(source("contract")["lines"], READ_ROUTES_SECTION)
+        self.assertTrue(rows)
+        aggregates = self.fixture["contract"]["aggregate_routes"]
+        for route in rows:
+            with self.subTest(route=route):
+                if route in aggregates:
+                    field = aggregates[route]
+                    self.assertTrue(
+                        any(provider.get(field) for provider in self.providers),
+                        f"{route} aggregates {field} but no provider declares one",
+                    )
+                else:
+                    self.assertIn(route, sorted(self.routes))
+        self.assertEqual(
+            [row for row in rows if row not in aggregates], self.fixture["contract"]["provider_read_routes"]
+        )
+
+    def test_signed_webhook_auth_class_matches_snapshot(self) -> None:
+        lines = source("contract")["lines"].values()
+        signed = next(line for line in lines if line.startswith("| Signed webhook |"))
+        signed_paths = set(re.findall(r"`(/api/webhook/[a-z-]+)`", signed))
+        fixture_signed = {
+            route.split(" ", 1)[1]
+            for provider in self.providers
+            if provider["auth_class"] == "signed-webhook"
+            for route in provider["routes"]
+        }
+        self.assertEqual(signed_paths, fixture_signed)
+
+    def test_no_mapped_route_is_outside_the_contract(self) -> None:
+        contract = self.fixture["contract"]
+        allowed = set(contract["webhook_routes"]) | set(contract["provider_read_routes"])
+        self.assertEqual(set(self.routes) - allowed, set())
+
+    def test_every_health_probe_is_mapped(self) -> None:
+        defined, active = health_probes()
+        internal = set(self.fixture["internal_health_checks"])
+        external = defined - internal
+        self.assertGreaterEqual(len(external), 28)
+        by_check = {provider["health_check"]: provider for provider in self.providers if provider["health_check"]}
+        self.assertEqual(set(by_check), external, "integration_health.py probes vs fixture health_check")
+        self.assertLessEqual(active, external)
+        for check, provider in by_check.items():
+            with self.subTest(check=check):
+                expected = "active" if check in active else "paused"
+                self.assertEqual(provider["health_status"], expected)
+                self.assertIn("outbound", provider["directions"])
+                self.assertTrue(
+                    any(call["via"] == "GET /api/integrations/health" for call in provider["outbound_calls"])
+                )
+
+    def test_every_discovery_source_is_mapped(self) -> None:
+        lines = source("discovery")["lines"].values()
+        constants = dict(
+            m.groups() for line in lines if (m := re.match(r'([A-Z_]+_URL) = "(https://[^"]+)"', line))
+        )
+        self.assertEqual(set(constants), {"APIS_GURU_URL", "MCP_REGISTRY_URL"})
+        by_source = {p["discovery_source"]: p for p in self.providers if p["discovery_source"]}
+        self.assertEqual(set(by_source), set(constants))
+        for name, url in constants.items():
+            with self.subTest(source=name):
+                calls = by_source[name]["outbound_calls"]
+                self.assertIn(url, [call["call"] for call in calls])
+
+    def test_every_ai_gateway_provider_is_mapped(self) -> None:
+        lines = source("ai_gateway")["lines"].values()
+        text = "\n".join(lines)
+        kinds = set(re.findall(r"provider !== '([a-z-]+)'", text))
+        env_names = set(re.findall(r"env\.(AI_GATEWAY_[A-Z_]+)", text))
+        self.assertEqual(kinds, {"openai-compatible"})
+        by_kind = {p["ai_provider"]: p for p in self.providers if p["ai_provider"]}
+        self.assertEqual(set(by_kind), kinds)
+        provider = by_kind["openai-compatible"]
+        self.assertLessEqual(env_names, set(provider["credential_refs"]))
+        self.assertIn("POST /api/ai/generate", [call["via"] for call in provider["outbound_calls"]])
+
+    def test_every_integrations_directory_is_mapped(self) -> None:
+        tree = next(t for t in load_sources()["trees"] if t["key"] == "integrations_dir")
+        dirs = sorted({path.split("/")[1] for path in tree["files"] if path.count("/") >= 2})
+        self.assertEqual(dirs, sorted(self.fixture["solo_empire_integrations_dirs"]))
+        self.assertEqual(dirs, sorted(self.fixture["integrations_dir_provider"]))
+        ids = {provider["provider"] for provider in self.providers}
         for directory, provider in self.fixture["integrations_dir_provider"].items():
             with self.subTest(directory=directory):
                 self.assertIn(provider, ids)
 
 
-class ContractCoverageTests(unittest.TestCase):
-    """Every contract webhook and provider route maps to a complete entry."""
-
-    def setUp(self) -> None:
-        self.fixture = load_fixture()
-        self.routes = mapped_routes(self.fixture)
-
-    def test_contract_webhook_routes_are_mapped(self) -> None:
-        for route in self.fixture["contract"]["webhook_routes"]:
-            with self.subTest(route=route):
-                self.assertIn(route, sorted(self.routes))
-                self.assertEqual(self.routes[route]["direction"], "inbound-webhook")
-
-    def test_contract_provider_read_routes_are_mapped(self) -> None:
-        for route in self.fixture["contract"]["provider_read_routes"]:
-            with self.subTest(route=route):
-                self.assertIn(route, sorted(self.routes))
-
-    def test_no_mapped_route_is_outside_the_contract(self) -> None:
-        contract_routes = set(self.fixture["contract"]["webhook_routes"]) | set(
-            self.fixture["contract"]["provider_read_routes"]
-        )
-        self.assertEqual(set(self.routes) - contract_routes, set())
-
-    def _architecture_docs(self) -> Path | None:
-        configured = os.environ.get("ARCHITECTURE_DOCS_ROOT")
-        candidate = Path(configured) if configured else DEFAULT_ARCH_DOCS
-        contract = candidate / self.fixture["contract"]["path"]
-        return contract if contract.is_file() else None
+class LiveSourceDriftTests(unittest.TestCase):
+    """Optional: with local checkouts, prove the snapshot still matches git."""
 
     @staticmethod
-    def _section_rows(text: str, heading: str) -> list[str]:
-        start = text.index(heading)
-        following = text.find("\n#", start + len(heading))
-        section = text[start : following if following != -1 else len(text)]
-        rows = []
-        for line in section.splitlines():
-            match = re.match(r"\|\s*`(GET|POST)`\s*\|\s*`([^`]+)`", line)
-            if match:
-                rows.append(f"{match.group(1)} {match.group(2)}")
-        return rows
+    def _repo_root(key: str) -> Path | None:
+        if key == "contract":
+            candidate = Path(os.environ.get("ARCHITECTURE_DOCS_ROOT") or DEFAULT_ARCH_DOCS)
+        else:
+            configured = os.environ.get("SOLO_EMPIRE_ROOT")
+            if not configured and DEFAULT_SOLO_EMPIRE is None:
+                return None
+            candidate = Path(configured) if configured else DEFAULT_SOLO_EMPIRE
+        return candidate if (candidate / ".git").exists() else None
 
-    def test_vendored_routes_match_live_contract_when_available(self) -> None:
-        contract = self._architecture_docs()
-        if contract is None:
+    @staticmethod
+    def _git_show(repo: Path, commit: str, path: str) -> bytes | None:
+        result = subprocess.run(
+            ["git", "-C", str(repo), "show", f"{commit}:{path}"], capture_output=True, check=False
+        )
+        return result.stdout if result.returncode == 0 else None
+
+    def test_snapshot_lines_and_hashes_match_git(self) -> None:
+        checked = 0
+        for entry in load_sources()["sources"]:
+            repo = self._repo_root(entry["key"])
+            if repo is None:
+                continue
+            raw = self._git_show(repo, entry["commit"], entry["path"])
+            if raw is None:
+                continue
+            with self.subTest(source=entry["key"]):
+                self.assertEqual(hashlib.sha256(raw).hexdigest(), entry["sha256"])
+                lines = raw.decode("utf-8").split("\n")
+                for number, text in entry["lines"].items():
+                    self.assertEqual(lines[int(number) - 1], text, f"{entry['path']}:{number}")
+            checked += 1
+        if checked == 0:
+            self.skipTest("no architecture-docs / solo-empire checkout (set ARCHITECTURE_DOCS_ROOT, SOLO_EMPIRE_ROOT)")
+
+    def test_snapshot_tree_matches_git(self) -> None:
+        tree = next(t for t in load_sources()["trees"] if t["key"] == "integrations_dir")
+        repo = self._repo_root("solo-empire")
+        if repo is None:
+            self.skipTest("no solo-empire checkout (set SOLO_EMPIRE_ROOT)")
+        result = subprocess.run(
+            ["git", "-C", str(repo), "ls-tree", "-r", "--name-only", tree["commit"], "--", tree["path"]],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.returncode != 0:
+            self.skipTest("pinned solo-empire commit not available locally")
+        self.assertEqual(result.stdout.split(), tree["files"])
+
+    def test_live_contract_still_matches_snapshot(self) -> None:
+        repo = self._repo_root("contract")
+        entry = source("contract")
+        if repo is None or not (repo / entry["path"]).is_file():
             self.skipTest("architecture-docs checkout not available (set ARCHITECTURE_DOCS_ROOT)")
-        text = contract.read_text(encoding="utf-8")
-        self.assertEqual(self._section_rows(text, CONTRACT_SECTION), self.fixture["contract"]["webhook_routes"])
-        provider_rows = [
-            row for row in self._section_rows(text, READ_ROUTES_SECTION) if row.startswith("GET /api/integrations/")
-        ]
-        provider_rows = [
-            row
-            for row in provider_rows
-            if row not in {"GET /api/integrations/health", "GET /api/integrations/discovery"}
-        ]
-        self.assertEqual(provider_rows, self.fixture["contract"]["provider_read_routes"])
-        signed = re.search(r"^\| Signed webhook \| (.+?) \|", text, re.MULTILINE)
-        self.assertIsNotNone(signed)
-        signed_paths = set(re.findall(r"`(/api/webhook/[a-z-]+)`", signed.group(1)))
-        fixture_signed = {
-            route.split(" ", 1)[1]
-            for provider in self.fixture["providers"]
-            if provider["auth_class"] == "signed-webhook"
-            for route in provider["routes"]
-        }
-        self.assertEqual(signed_paths, fixture_signed)
+        raw = (repo / entry["path"]).read_bytes()
+        self.assertEqual(
+            hashlib.sha256(raw).hexdigest(),
+            entry["sha256"],
+            "working-tree contract differs from the pinned snapshot; re-pin and re-map",
+        )
 
 
 class GatewaySourceCoverageTests(unittest.TestCase):
@@ -352,6 +545,11 @@ class GatewayWebhookBehaviourTests(unittest.TestCase):
     def test_gateway_module_has_no_signature_verifier(self) -> None:
         names = {name.lower() for name in dir(gateway_server)}
         self.assertFalse(any("signature" in name or "webhook" in name for name in names))
+        # The only HMAC use is the constant-time Bearer compare; computing a
+        # digest over a request body would be a verifier that must be mapped.
+        source = SERVER_SOURCE.read_text(encoding="utf-8")
+        self.assertNotIn("hmac.new(", source)
+        self.assertNotIn("hmac.digest(", source)
 
 
 if __name__ == "__main__":
