@@ -39,7 +39,11 @@ runs the unit tests: routing/authentication behavior, path and request-body
 hardening, rate limiting, upstream timeout handling, and telemetry redaction.
 GitHub Actions runs the same command on every push and pull request
 (`.github/workflows/check.yml`). Planned work is tracked in
-[`docs/UPGRADE-PLAN.md`](docs/UPGRADE-PLAN.md).
+[`docs/UPGRADE-PLAN.md`](docs/UPGRADE-PLAN.md). Gate evidence: the external
+provider / webhook signature, idempotency and privacy map is in
+[`docs/gates/BOO-147-webhook-provider-map.md`](docs/gates/BOO-147-webhook-provider-map.md)
+(fixture `fixtures/gates/webhook-provider-map.json`, pinned by
+`tests/test_webhook_provider_map.py`).
 It uses only loopback fixtures and does not claim deployment, provider
 connectivity, data migration, or production readiness.
 
