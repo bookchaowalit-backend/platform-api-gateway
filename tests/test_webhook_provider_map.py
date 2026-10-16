@@ -165,7 +165,7 @@ class FixtureCompletenessTests(unittest.TestCase):
                     self.assertIsInstance(replay.get("seconds"), int)
                     self.assertGreater(replay["seconds"], 0)
                 self.assertIn(provider["privacy_class"], vocabulary)
-                self.assertIn(provider["privacy_class_basis"], {"cited", "proposed"})
+                self.assertIn(provider["privacy_class_basis"], {"cited", "owner-accepted"})
                 self.assertTrue(_nonempty(provider["privacy_evidence"]))
                 self.assertTrue(provider["evidence"], "evidence citations")
 
@@ -219,6 +219,42 @@ class FixtureCompletenessTests(unittest.TestCase):
                 self.assertTrue(shas, "no architecture-docs citation found")
                 for sha in shas:
                     self.assertTrue(revision.startswith(sha), f"architecture-docs@{sha} is not {revision}")
+
+
+class OwnerDecisionTests(unittest.TestCase):
+    """The owner decision of 2026-10-16 is recorded in fixture and doc."""
+
+    DATE = "2026-10-16"
+    HEADING = "## Owner decision — ACCEPTED (owner decision 2026-10-16)"
+    ANSWER = "ทั้งหมด ยกเว้น 140/256 (Recommended)"
+
+    def setUp(self) -> None:
+        self.fixture = load_fixture()
+        self.decision = self.fixture.get("owner_decision") or {}
+
+    def test_fixture_records_accepted_decision_with_date(self) -> None:
+        self.assertEqual(self.decision.get("status"), "accepted")
+        self.assertEqual(self.decision.get("date"), self.DATE)
+        self.assertEqual(self.decision.get("answer_verbatim"), self.ANSWER)
+        self.assertTrue(_nonempty(self.decision.get("relayed_via")))
+        self.assertTrue(self.decision.get("accepted"))
+        self.assertEqual(self.decision.get("doc_heading"), self.HEADING)
+
+    def test_still_open_items_are_recorded(self) -> None:
+        still_open = self.decision.get("still_open") or []
+        self.assertTrue(any("ingress location" in item for item in still_open))
+        self.assertTrue(any("cutover" in item for item in still_open))
+
+    def test_doc_carries_accepted_marker_and_verbatim_answer(self) -> None:
+        text = GATE_DOC.read_text(encoding="utf-8")
+        self.assertIn(self.HEADING, text)
+        self.assertIn(self.ANSWER, text)
+        self.assertIn("### Still open after the decision", text)
+        self.assertNotIn("PROPOSED, NOT ACCEPTED", text)
+
+    def test_privacy_classes_are_cited_or_owner_accepted(self) -> None:
+        bases = {provider["privacy_class_basis"] for provider in self.fixture["providers"]}
+        self.assertEqual(bases, {"cited", "owner-accepted"})
 
 
 class SourceSnapshotCoverageTests(unittest.TestCase):

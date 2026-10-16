@@ -202,7 +202,7 @@
         "evidence": "platform-legacy-api-archive@74b68443:stripe.ts:17,33-37"
       },
       "privacy_class": "restricted",
-      "privacy_class_basis": "proposed",
+      "privacy_class_basis": "owner-accepted",
       "privacy_evidence": "raw payment event body is persisted verbatim (solo-empire@1d0e04bb:infra/api/server.ts:1079); payment events can carry customer contact and billing fields",
       "evidence": [
         "architecture-docs@a9c84727:systems/architecture/solo-empire-api-contract-v1.md:61",
@@ -266,7 +266,7 @@
         "evidence": "solo-empire@aa567aab:infra/api/server.ts:1458-1484"
       },
       "privacy_class": "internal",
-      "privacy_class_basis": "proposed",
+      "privacy_class_basis": "owner-accepted",
       "privacy_evidence": "aggregate per-asset counters only (views, subscribers, revenue, engagement_rate)",
       "evidence": [
         "architecture-docs@a9c84727:systems/architecture/solo-empire-api-contract-v1.md:60",
@@ -320,7 +320,7 @@
         "evidence": "solo-empire@aa567aab:infra/api/server.ts:1489-1532"
       },
       "privacy_class": "restricted",
-      "privacy_class_basis": "proposed",
+      "privacy_class_basis": "owner-accepted",
       "privacy_evidence": "finance records (amount, source_name, description) written to the revenue ledger",
       "evidence": [
         "architecture-docs@a9c84727:systems/architecture/solo-empire-api-contract-v1.md:60",
@@ -364,7 +364,7 @@
         "detail": "read-only GET"
       },
       "privacy_class": "internal",
-      "privacy_class_basis": "proposed",
+      "privacy_class_basis": "owner-accepted",
       "privacy_evidence": "unresolved issue summaries only; event payloads never returned",
       "evidence": [
         "architecture-docs@a9c84727:systems/architecture/solo-empire-api-contract-v1.md:122",
@@ -418,7 +418,7 @@
         "detail": "read-only GET"
       },
       "privacy_class": "internal",
-      "privacy_class_basis": "proposed",
+      "privacy_class_basis": "owner-accepted",
       "privacy_evidence": "saved-insight metadata; query, event, result and person payloads stripped",
       "evidence": [
         "architecture-docs@a9c84727:systems/architecture/solo-empire-api-contract-v1.md:123",
@@ -472,7 +472,7 @@
         "detail": "read-only GET"
       },
       "privacy_class": "internal",
-      "privacy_class_basis": "proposed",
+      "privacy_class_basis": "owner-accepted",
       "privacy_evidence": "public non-archived channel summaries; no messages",
       "evidence": [
         "architecture-docs@a9c84727:systems/architecture/solo-empire-api-contract-v1.md:124",
@@ -524,7 +524,7 @@
         "detail": "read-only GET"
       },
       "privacy_class": "private",
-      "privacy_class_basis": "proposed",
+      "privacy_class_basis": "owner-accepted",
       "privacy_evidence": "page/data-source titles from a personal workspace; block content and user details dropped",
       "evidence": [
         "architecture-docs@a9c84727:systems/architecture/solo-empire-api-contract-v1.md:125",
@@ -577,7 +577,7 @@
         "detail": "read-only GET"
       },
       "privacy_class": "internal",
-      "privacy_class_basis": "proposed",
+      "privacy_class_basis": "owner-accepted",
       "privacy_evidence": "workspace and compact project metadata; no task content",
       "evidence": [
         "architecture-docs@a9c84727:systems/architecture/solo-empire-api-contract-v1.md:126-127",
@@ -630,7 +630,7 @@
         "detail": "read-only GET"
       },
       "privacy_class": "internal",
-      "privacy_class_basis": "proposed",
+      "privacy_class_basis": "owner-accepted",
       "privacy_evidence": "team and project metadata",
       "evidence": [
         "architecture-docs@a9c84727:systems/architecture/solo-empire-api-contract-v1.md:128-129",
@@ -681,7 +681,7 @@
         "detail": "read-only GET"
       },
       "privacy_class": "internal",
-      "privacy_class_basis": "proposed",
+      "privacy_class_basis": "owner-accepted",
       "privacy_evidence": "partial guild metadata; messages and members disabled",
       "evidence": [
         "architecture-docs@a9c84727:systems/architecture/solo-empire-api-contract-v1.md:130",
@@ -734,7 +734,7 @@
         "detail": "read-only GET"
       },
       "privacy_class": "private",
-      "privacy_class_basis": "proposed",
+      "privacy_class_basis": "owner-accepted",
       "privacy_evidence": "business phone-number metadata, masked before return",
       "evidence": [
         "architecture-docs@a9c84727:systems/architecture/solo-empire-api-contract-v1.md:131",
@@ -788,7 +788,7 @@
         "detail": "read-only GET"
       },
       "privacy_class": "private",
-      "privacy_class_basis": "proposed",
+      "privacy_class_basis": "owner-accepted",
       "privacy_evidence": "signed-in user id and displayName only",
       "evidence": [
         "architecture-docs@a9c84727:systems/architecture/solo-empire-api-contract-v1.md:132",
@@ -841,7 +841,7 @@
         "detail": "read-only GET"
       },
       "privacy_class": "private",
-      "privacy_class_basis": "proposed",
+      "privacy_class_basis": "owner-accepted",
       "privacy_evidence": "user id, display_name and status only",
       "evidence": [
         "architecture-docs@a9c84727:systems/architecture/solo-empire-api-contract-v1.md:133",
@@ -894,7 +894,7 @@
         "detail": "read-only GET"
       },
       "privacy_class": "internal",
-      "privacy_class_basis": "proposed",
+      "privacy_class_basis": "owner-accepted",
       "privacy_evidence": "board id, name and state only",
       "evidence": [
         "architecture-docs@a9c84727:systems/architecture/solo-empire-api-contract-v1.md:134",
@@ -945,7 +945,7 @@
         "detail": "read-only probe"
       },
       "privacy_class": "private",
-      "privacy_class_basis": "proposed",
+      "privacy_class_basis": "owner-accepted",
       "privacy_evidence": "personal calendar data",
       "evidence": [
         "solo-empire@981a12db:integrations/google/setup_calendar.py",
@@ -1000,7 +1000,7 @@
         "detail": "no HTTP route"
       },
       "privacy_class": "private",
-      "privacy_class_basis": "proposed",
+      "privacy_class_basis": "owner-accepted",
       "privacy_evidence": "personal browsing bookmarks",
       "evidence": [
         "solo-empire@981a12db:integrations/brave-bookmarks/README.md",
@@ -1041,7 +1041,7 @@
         "detail": "read-only outbound call"
       },
       "privacy_class": "restricted",
-      "privacy_class_basis": "proposed",
+      "privacy_class_basis": "owner-accepted",
       "privacy_evidence": "personal mailbox; the historical pipeline read message metadata",
       "evidence": [
         "solo-empire@981a12db:infra/scripts/sync/integration_health.py:96-115",
@@ -1095,7 +1095,7 @@
         "detail": "read-only outbound call"
       },
       "privacy_class": "private",
-      "privacy_class_basis": "proposed",
+      "privacy_class_basis": "owner-accepted",
       "privacy_evidence": "personal drive metadata",
       "evidence": [
         "solo-empire@981a12db:infra/scripts/sync/integration_health.py:117-136",
@@ -1148,7 +1148,7 @@
         "detail": "read-only outbound call"
       },
       "privacy_class": "internal",
-      "privacy_class_basis": "proposed",
+      "privacy_class_basis": "owner-accepted",
       "privacy_evidence": "identity probe only; no repository contents",
       "evidence": [
         "solo-empire@981a12db:infra/scripts/sync/integration_health.py:138-160"
@@ -1196,7 +1196,7 @@
         "detail": "read-only outbound call"
       },
       "privacy_class": "internal",
-      "privacy_class_basis": "proposed",
+      "privacy_class_basis": "owner-accepted",
       "privacy_evidence": "token verification only",
       "evidence": [
         "solo-empire@981a12db:infra/scripts/sync/integration_health.py:162-181",
@@ -1245,7 +1245,7 @@
         "detail": "read-only outbound call"
       },
       "privacy_class": "internal",
-      "privacy_class_basis": "proposed",
+      "privacy_class_basis": "owner-accepted",
       "privacy_evidence": "project list metadata",
       "evidence": [
         "solo-empire@981a12db:infra/scripts/sync/integration_health.py:183-202",
@@ -1295,7 +1295,7 @@
         "detail": "read-only outbound call"
       },
       "privacy_class": "internal",
-      "privacy_class_basis": "proposed",
+      "privacy_class_basis": "owner-accepted",
       "privacy_evidence": "service metadata",
       "evidence": [
         "solo-empire@981a12db:infra/scripts/sync/integration_health.py:204-206",
@@ -1345,7 +1345,7 @@
         "detail": "read-only outbound call"
       },
       "privacy_class": "internal",
-      "privacy_class_basis": "proposed",
+      "privacy_class_basis": "owner-accepted",
       "privacy_evidence": "account metadata",
       "evidence": [
         "solo-empire@981a12db:infra/scripts/sync/integration_health.py:209-211",
@@ -1397,7 +1397,7 @@
         "detail": "read-only outbound call"
       },
       "privacy_class": "internal",
-      "privacy_class_basis": "proposed",
+      "privacy_class_basis": "owner-accepted",
       "privacy_evidence": "app list metadata",
       "evidence": [
         "solo-empire@981a12db:infra/scripts/sync/integration_health.py:214-216",
@@ -1450,7 +1450,7 @@
         "detail": "read-only outbound call"
       },
       "privacy_class": "internal",
-      "privacy_class_basis": "proposed",
+      "privacy_class_basis": "owner-accepted",
       "privacy_evidence": "account metadata",
       "evidence": [
         "solo-empire@981a12db:infra/scripts/sync/integration_health.py:219-221",
@@ -1502,7 +1502,7 @@
         "detail": "read-only outbound call"
       },
       "privacy_class": "internal",
-      "privacy_class_basis": "proposed",
+      "privacy_class_basis": "owner-accepted",
       "privacy_evidence": "bot identity (getMe) only; no inbound Telegram webhook route exists",
       "evidence": [
         "solo-empire@981a12db:infra/scripts/sync/integration_health.py:224-240"
@@ -1554,7 +1554,7 @@
         "detail": "read-only outbound call"
       },
       "privacy_class": "internal",
-      "privacy_class_basis": "proposed",
+      "privacy_class_basis": "owner-accepted",
       "privacy_evidence": "project tickets via MCP tools/call; probe asks for one ticket",
       "evidence": [
         "solo-empire@981a12db:infra/scripts/sync/integration_health.py:848-874"
@@ -1598,7 +1598,7 @@
         "detail": "read-only outbound call"
       },
       "privacy_class": "private",
-      "privacy_class_basis": "proposed",
+      "privacy_class_basis": "owner-accepted",
       "privacy_evidence": "personal tasks and projects",
       "evidence": [
         "solo-empire@981a12db:infra/scripts/sync/integration_health.py:876-898",
@@ -1647,7 +1647,7 @@
         "detail": "read-only outbound call"
       },
       "privacy_class": "restricted",
-      "privacy_class_basis": "proposed",
+      "privacy_class_basis": "owner-accepted",
       "privacy_evidence": "personal health/activity data; check intentionally paused",
       "evidence": [
         "solo-empire@981a12db:infra/scripts/sync/integration_health.py:900-922",
@@ -1697,7 +1697,7 @@
         "detail": "read-only outbound call"
       },
       "privacy_class": "restricted",
-      "privacy_class_basis": "proposed",
+      "privacy_class_basis": "owner-accepted",
       "privacy_evidence": "finance/exchange account credentials; check intentionally paused",
       "evidence": [
         "solo-empire@981a12db:infra/scripts/sync/integration_health.py:924-945",
@@ -1749,7 +1749,7 @@
         "detail": "read-only outbound call"
       },
       "privacy_class": "public",
-      "privacy_class_basis": "proposed",
+      "privacy_class_basis": "owner-accepted",
       "privacy_evidence": "public API directory listing",
       "evidence": [
         "solo-empire@981a12db:infra/scripts/sync/discover_external_apps.py:26",
@@ -1794,7 +1794,7 @@
         "detail": "read-only outbound call"
       },
       "privacy_class": "public",
-      "privacy_class_basis": "proposed",
+      "privacy_class_basis": "owner-accepted",
       "privacy_evidence": "public MCP server registry",
       "evidence": [
         "solo-empire@981a12db:infra/scripts/sync/discover_external_apps.py:27",
@@ -1841,7 +1841,7 @@
         "detail": "read-only outbound call"
       },
       "privacy_class": "private",
-      "privacy_class_basis": "proposed",
+      "privacy_class_basis": "owner-accepted",
       "privacy_evidence": "caller prompts and generated text cross to the provider; contract says prompt/response bodies are not recorded (contract:119)",
       "evidence": [
         "solo-empire@328b2537:infra/api/ai_gateway.ts:274-287",
@@ -1892,5 +1892,23 @@
   "internal_health_checks": {
     "check_db_freshness": "reads internal cell freshness; no external provider"
   },
-  "credential_reference_rule": "credential_refs hold environment/secret NAMES only, never values"
+  "credential_reference_rule": "credential_refs hold environment/secret NAMES only, never values",
+  "owner_decision": {
+    "status": "accepted",
+    "date": "2026-10-16",
+    "answer_verbatim": "ทั้งหมด ยกเว้น 140/256 (Recommended)",
+    "relayed_via": "parent coordinating session local_a6dedf75",
+    "accepted": [
+      "provider/webhook map within the pinned-source scope",
+      "proposed privacy classes",
+      "signed ingress as proposed (item 2 decision rule; item 3 pre-reactivation requirements)"
+    ],
+    "still_open": [
+      "ingress location: (a) gateway signed-webhook route class vs (b) cell-direct delivery",
+      "LINE timestamp replay window",
+      "implementation of unique (source, external_id), Idempotency-Key retention and Stripe payload redaction",
+      "no route reactivation, runtime move or production cutover approved"
+    ],
+    "doc_heading": "## Owner decision — ACCEPTED (owner decision 2026-10-16)"
+  }
 }

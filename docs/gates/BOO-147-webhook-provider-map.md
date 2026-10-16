@@ -11,8 +11,9 @@
 - Pinned source snapshot: [`fixtures/gates/webhook-provider-sources.json`](../../fixtures/gates/webhook-provider-sources.json)
 - Drift tests: [`tests/test_webhook_provider_map.py`](../../tests/test_webhook_provider_map.py) (run by `bash scripts/check.sh`)
 
-This is evidence for an owner decision. It does not change any route, does not
-activate a runtime, and does not record an accepted decision.
+This is gate evidence plus the owner decision recorded on 2026-10-16 (see
+"Owner decision" below). It does not change any route and does not activate a
+runtime.
 
 ## Scope of "every provider" (what the tests enforce)
 
@@ -59,9 +60,9 @@ provider delivery reached it.
 | Route | Direction | Signature scheme / header | Verification location | Idempotency key source | Replay window | Privacy class |
 |---|---|---|---|---|---|---|
 | `POST /api/webhook/line` | inbound (+ outbound health probe `api.line.me/v2/bot/info`, `integration_health.py:259`) | HMAC-SHA256(raw body), base64, `x-line-signature`; secret ref `LINE_SOLO_EMPIRE_WEBHOOK_SECRET`; 401 on mismatch, 503 unconfigured | archive `line.ts:8-23`; called at solo-empire `1d0e04bb:infra/api/server.ts:975`. **Gateway: missing** | `event.webhookEventId`, else `event.message.id` (`line.ts:34-42`); `webhook_log(source,external_id)` lookup (`server.ts:1004-1012`) | **missing**: no timestamp check (`server.ts:965-1031`) | `restricted` (cited: `integrations/line/README.md:97-101`) |
-| `POST /api/webhook/stripe` | inbound (+ outbound `GET api.stripe.com/v1/balance`, `integration_health.py:288`, ref `STRIPE_SECRET_KEY`) | Stripe v1: HMAC-SHA256 hex of `${t}.${rawBody}`, `stripe-signature`; secret ref `STRIPE_WEBHOOK_SECRET`; 400 on mismatch, 503 unconfigured | archive `stripe.ts:12-53`; called at `1d0e04bb:infra/api/server.ts:1046`. **Gateway: missing** | Stripe event `id`; `webhook_log` lookup (`server.ts:1062-1079`) | **300 s** on `t` (`stripe.ts:17,33-37`) | `restricted` (proposed: raw event body stored verbatim, `server.ts:1079`) |
-| `POST /api/webhook/analytics` | inbound (internal caller) | none; Bearer `api:write` via `/api/webhook/*` guard (refs `API_TOKEN`, `API_TOKENS_JSON`) | `aa567aab:infra/api/server.ts:1294-1300`. Gateway: Bearer only (`server.py:212-229`) | natural key `(asset_id, metric_date)` upsert (`server.ts:1416-1487`) | not applicable (idempotent upsert) | `internal` (proposed) |
-| `POST /api/webhook/revenue` | inbound (internal caller) | none; Bearer `api:write` | `aa567aab:infra/api/server.ts:1294-1300`. Gateway: Bearer only | `Idempotency-Key` header, 1..255 chars, duplicate → `{success, id, duplicate:true}` (`server.ts:1492-1531`) | **missing** (no timestamp, no key expiry) | `restricted` (proposed: finance ledger rows) |
+| `POST /api/webhook/stripe` | inbound (+ outbound `GET api.stripe.com/v1/balance`, `integration_health.py:288`, ref `STRIPE_SECRET_KEY`) | Stripe v1: HMAC-SHA256 hex of `${t}.${rawBody}`, `stripe-signature`; secret ref `STRIPE_WEBHOOK_SECRET`; 400 on mismatch, 503 unconfigured | archive `stripe.ts:12-53`; called at `1d0e04bb:infra/api/server.ts:1046`. **Gateway: missing** | Stripe event `id`; `webhook_log` lookup (`server.ts:1062-1079`) | **300 s** on `t` (`stripe.ts:17,33-37`) | `restricted` (owner-accepted: raw event body stored verbatim, `server.ts:1079`) |
+| `POST /api/webhook/analytics` | inbound (internal caller) | none; Bearer `api:write` via `/api/webhook/*` guard (refs `API_TOKEN`, `API_TOKENS_JSON`) | `aa567aab:infra/api/server.ts:1294-1300`. Gateway: Bearer only (`server.py:212-229`) | natural key `(asset_id, metric_date)` upsert (`server.ts:1416-1487`) | not applicable (idempotent upsert) | `internal` (owner-accepted) |
+| `POST /api/webhook/revenue` | inbound (internal caller) | none; Bearer `api:write` | `aa567aab:infra/api/server.ts:1294-1300`. Gateway: Bearer only | `Idempotency-Key` header, 1..255 chars, duplicate → `{success, id, duplicate:true}` (`server.ts:1492-1531`) | **missing** (no timestamp, no key expiry) | `restricted` (owner-accepted: finance ledger rows) |
 
 ## Outbound providers (health probes, provider read routes, discovery, AI)
 
@@ -71,7 +72,7 @@ idempotency is `none`. Each outbound provider was reached only through a
 Bearer-protected route. Credential columns list **reference names only**; the
 fixture test rejects anything that is not an upper-case name.
 
-| Provider | Reached via | Source probe / key | Outbound call | Credential reference names (never values) | Privacy (proposed) |
+| Provider | Reached via | Source probe / key | Outbound call | Credential reference names (never values) | Privacy (owner-accepted) |
 |---|---|---|---|---|---|
 | Sentry | `GET /api/integrations/health`, `GET /api/integrations/sentry/issues` | `check_sentry (active)` | `https://sentry.io/api/0/organizations/{org}/` (integration_health.py:326) | `SENTRY_AUTH_TOKEN`, `SENTRY_ORG_SLUG`, `SENTRY_BASE_URL` | internal |
 | PostHog | `GET /api/integrations/health`, `GET /api/integrations/posthog/insights` | `check_posthog (active)` | `https://us.posthog.com/api/projects/{project}/insights/` (integration_health.py:373) | `POSTHOG_API_KEY`, `POSTHOG_PROJECT_ID`, `POSTHOG_HOST` | internal |
@@ -110,8 +111,9 @@ Evidence lines in the outbound-call column refer to solo-empire@981a12db, except
 
 Privacy vocabulary is `public | internal | private | restricted`
 (solo-empire `9f44f602^:infra/scripts/cli/data-intake-cli.py:63`). Only LINE's
-class is cited from source. The other 33 are marked `proposed` in the fixture
-and need owner acceptance.
+class is cited from source. The other 33 were proposed by this gate and
+accepted by the owner on 2026-10-16 (`privacy_class_basis: owner-accepted` in
+the fixture).
 
 ## Gateway behaviour against these routes (tested with synthetic secrets)
 
@@ -137,13 +139,17 @@ test covers the Bearer check that the gateway does implement (`server.py:212-229
 6. Stripe payloads were persisted verbatim (`server.ts:1079`); no redaction rule before storage.
 7. `POST /api/ai/generate` has no idempotency key, so caller retries can duplicate provider spend.
 8. The Leantime probe sends no credential; the endpoint's own auth is not visible in this source.
-9. 33 of 34 privacy classes are proposals, not sourced classifications.
+9. 33 of 34 privacy classes rest on the owner acceptance of 2026-10-16, not on a sourced classification.
 10. The contract is `retired`, and the webhook and `/api/ai/*` routes are 410 in the archive. No live owner for inbound provider ingress is recorded.
 11. Providers used outside the pinned sources (other cells) are out of scope for this map.
 
-## Owner decision — PROPOSED, NOT ACCEPTED
+## Owner decision — ACCEPTED (owner decision 2026-10-16)
 
-Proposed for the owner to accept, amend or reject:
+Owner's answer, verbatim: "ทั้งหมด ยกเว้น 140/256 (Recommended)" ("all except
+140/256, recommended options"), relayed via the parent coordinating session
+(`local_a6dedf75`). For BOO-147 that accepts the provider map, the proposed
+privacy classes, and signed ingress as proposed. The accepted option text is
+kept exactly as proposed:
 
 1. Accept this fixture as the provider/webhook inventory for the `integrations` system, within the scope above, including the proposed privacy classes:
    - `restricted`: LINE, Stripe, revenue, Gmail, Strava, Binance TH.
@@ -162,8 +168,18 @@ Proposed for the owner to accept, amend or reject:
    - an `Idempotency-Key` retention window;
    - a redaction rule for stored Stripe payloads.
 
-No status change, runtime move, production cutover or human acceptance is
-claimed by this document.
+### Still open after the decision
+
+- **Ingress location (a) vs (b).** Item 2 offered two options without
+  recommending one. The owner accepted it as proposed, so the rule "decide
+  before any route is reactivated; until then the gateway stays as is and the
+  routes stay retired" is accepted. The choice between (a) a gateway
+  `signed-webhook` route class and (b) cell-direct delivery is still open.
+  The LINE timestamp window is also still open.
+- Gaps 1-8, 10 and 11 above are unchanged. The decision accepts the
+  requirements in item 3, but does not implement them.
+- No route, runtime, registry or status change was made. The decision approves
+  no production cutover or route reactivation.
 
 ## Re-running
 
