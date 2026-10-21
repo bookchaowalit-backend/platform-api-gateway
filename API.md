@@ -26,7 +26,11 @@ the identity platform is the dependency for a production subject assertion
 
 ## Request handling
 
-Every `/api/*` request receives a validated `X-Request-ID`, is rate-limited per
+Every `/api/*` request receives a validated `X-Request-ID`. Failed bearer
+tokens are counted per client IP (socket peer, `AUTH_FAILURE_LIMIT_PER_MINUTE`,
+default 10); once a client exceeds that, every `/api/*` request from it gets 429
+until the window resets, even with the right token, and nothing reaches the
+upstream. Authenticated requests are then rate-limited per
 authenticated subject (at most 10,000 tracked windows; expired then oldest
 windows are evicted first), and forwards only `Accept`, `Content-Type`, conditional
 request headers, `X-Request-ID` and a hashed subject marker
@@ -58,6 +62,7 @@ Ingress hardening:
 | 411 | `chunked request bodies are not supported` | `Transfer-Encoding` present |
 | 413 | `request body too large` | Body above `MAX_BODY_BYTES` |
 | 429 | `rate limit exceeded` | Per-subject fixed window exhausted (`Retry-After`) |
+| 429 | `too many failed authentication attempts` | Client IP exceeded `AUTH_FAILURE_LIMIT_PER_MINUTE` wrong tokens (`Retry-After`) |
 | 502 | `upstream unavailable`, `upstream response too large` | Upstream error, redirect or oversize body; upstream bodies are not relayed |
 | 503 | `gateway authentication unavailable` | No gateway token configured (fails closed) |
 | 504 | `upstream timeout` | Upstream exceeded `UPSTREAM_TIMEOUT_SECONDS` |

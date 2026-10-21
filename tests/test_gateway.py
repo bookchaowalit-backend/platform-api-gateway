@@ -235,6 +235,30 @@ class GatewayTests(unittest.TestCase):
         self.assertGreaterEqual(int(response_headers["Retry-After"]), 1)
         self.assertEqual(payload["error"], "rate limit exceeded")
 
+    def test_repeated_bad_tokens_are_rate_limited(self) -> None:
+        base_url = self.start_gateway()
+        bad = {"Authorization": "Bearer wrong-guess"}
+        for attempt in range(10):
+            status, _headers, payload = call(f"{base_url}/api/demo/guess", headers=bad)
+            self.assertEqual(status, 401, f"attempt {attempt + 1}")
+
+        status, response_headers, payload = call(f"{base_url}/api/demo/guess", headers=bad)
+        self.assertEqual(status, 429)
+        self.assertGreaterEqual(int(response_headers["Retry-After"]), 1)
+        self.assertEqual(payload["error"], "too many failed authentication attempts")
+
+        # While the client is locked out even the right token is refused, so a
+        # guesser cannot tell a hit from a miss.
+        good = {"Authorization": f"Bearer {self.token}"}
+        self.assertEqual(call(f"{base_url}/api/demo/guess", headers=good)[0], 429)
+        self.assertEqual(self.upstream.records, [], "locked-out requests must not reach upstream")
+
+    def test_valid_requests_do_not_count_as_auth_failures(self) -> None:
+        base_url = self.start_gateway()
+        good = {"Authorization": f"Bearer {self.token}"}
+        for _ in range(15):
+            self.assertEqual(call(f"{base_url}/api/demo/ok", headers=good)[0], 200)
+
     def test_upstream_timeout_returns_sanitized_504(self) -> None:
         self.upstream.mode = "sleep"
         base_url = self.start_gateway(timeout=0.05)
@@ -478,6 +502,19 @@ class LimiterBoundTests(unittest.TestCase):
         # "a" was evicted, so its count restarts; "c" is still limited.
         self.assertTrue(limiter.allow("a")[0])
         self.assertFalse(limiter.allow("c")[0])
+
+    def test_is_blocked_peeks_without_counting(self) -> None:
+        now = [0.0]
+        limiter = FixedWindowRateLimiter(2, window_seconds=60, clock=lambda: now[0])
+        self.assertEqual(limiter.is_blocked("ip"), 0)
+        limiter.allow("ip")
+        self.assertEqual(limiter.is_blocked("ip"), 0, "one of two allowed")
+        limiter.allow("ip")
+        # is_blocked never adds to the count, so asking twice changes nothing.
+        self.assertGreaterEqual(limiter.is_blocked("ip"), 1)
+        self.assertGreaterEqual(limiter.is_blocked("ip"), 1)
+        now[0] = 61.0
+        self.assertEqual(limiter.is_blocked("ip"), 0)
 
     def test_rejects_non_positive_bound(self) -> None:
         with self.assertRaises(ValueError):

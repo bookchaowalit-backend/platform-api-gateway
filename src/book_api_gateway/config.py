@@ -87,6 +87,8 @@ class GatewayConfig:
     upstream_base_url: str = "http://127.0.0.1:9000"
     upstream_timeout_seconds: float = 2.0
     rate_limit_per_minute: int = 60
+    # Failed bearer tokens allowed per client IP per minute before 429.
+    auth_failure_limit_per_minute: int = 10
     max_body_bytes: int = 1_048_576
     allowed_hosts: frozenset[str] = field(default_factory=lambda: DEFAULT_ALLOWED_HOSTS)
 
@@ -103,6 +105,8 @@ class GatewayConfig:
             raise ConfigError("UPSTREAM_TIMEOUT_SECONDS must be a finite number greater than zero")
         if not isinstance(self.rate_limit_per_minute, int) or self.rate_limit_per_minute <= 0:
             raise ConfigError("RATE_LIMIT_PER_MINUTE must be greater than zero")
+        if not isinstance(self.auth_failure_limit_per_minute, int) or self.auth_failure_limit_per_minute <= 0:
+            raise ConfigError("AUTH_FAILURE_LIMIT_PER_MINUTE must be greater than zero")
         if not isinstance(self.max_body_bytes, int) or self.max_body_bytes <= 0:
             raise ConfigError("MAX_BODY_BYTES must be greater than zero")
         hosts = _normalise_hosts(self.allowed_hosts)
@@ -126,6 +130,7 @@ class GatewayConfig:
             upstream_base_url=os.getenv("UPSTREAM_BASE_URL", "http://127.0.0.1:9000"),
             upstream_timeout_seconds=_env_float("UPSTREAM_TIMEOUT_SECONDS", 2.0),
             rate_limit_per_minute=_env_int("RATE_LIMIT_PER_MINUTE", 60),
+            auth_failure_limit_per_minute=_env_int("AUTH_FAILURE_LIMIT_PER_MINUTE", 10),
             max_body_bytes=_env_int("MAX_BODY_BYTES", 1_048_576),
             allowed_hosts=allowed_hosts,
         )

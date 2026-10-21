@@ -66,3 +66,13 @@ class FixedWindowRateLimiter:
             if len(self._windows) > self.max_keys:
                 self._prune(now)
             return True, 0
+
+    def is_blocked(self, key: str) -> int:
+        """Return seconds until ``key`` may try again, or 0; never counts a request."""
+
+        now = self.clock()
+        with self._lock:
+            window_start, count = self._windows.get(key, (now, 0))
+            if now - window_start >= self.window_seconds or count < self.limit:
+                return 0
+            return max(1, math.ceil(self.window_seconds - (now - window_start)))

@@ -96,8 +96,12 @@ class GatewayState:
     telemetry_sink: TelemetrySink = _default_telemetry
     opener: Any = None
     upstream_probe: Callable[[], bool] | None = None
+    # Counts failed bearer tokens per client IP so guessing is bounded.
+    auth_failure_limiter: FixedWindowRateLimiter | None = None
 
     def __post_init__(self) -> None:
+        if self.auth_failure_limiter is None:
+            self.auth_failure_limiter = FixedWindowRateLimiter(self.config.auth_failure_limit_per_minute)
         if self.opener is None:
             self.opener = build_opener(_NoRedirectHandler())
         if self.upstream_probe is None:
@@ -273,8 +277,22 @@ class GatewayRequestHandler(BaseHTTPRequestHandler):
                 405, "method not allowed", request_id, extra_headers={"Allow": ", ".join(sorted(api_methods))}
             )
 
+        # Keyed on the socket peer: X-Forwarded-For is client-controlled until
+        # a trusted-proxy setting exists.
+        failure_key = "ip:" + str(self.client_address[0])
+        auth_failures = self.state.auth_failure_limiter
+        locked_for = auth_failures.is_blocked(failure_key)
+        if locked_for:
+            return self._error(
+                429,
+                "too many failed authentication attempts",
+                request_id,
+                extra_headers={"Retry-After": str(locked_for)},
+            )
         subject_hash = self._authenticate(request_id)
         if subject_hash is None:
+            if self._last_status == 401:
+                auth_failures.allow(failure_key)
             return self._last_status
         self._subject_hash = subject_hash
         allowed, retry_after = self.state.limiter.allow(subject_hash)
