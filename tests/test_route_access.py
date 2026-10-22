@@ -17,9 +17,10 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from book_api_gateway.config import GatewayConfig  # noqa: E402
-from book_api_gateway.server import PUBLIC, ROUTE_ACCESS, SERVICE, create_server  # noqa: E402
-from test_gateway import RecordingUpstreamServer, start_server  # noqa: E402
+from test_gateway import RecordingUpstreamServer, start_server
+
+from book_api_gateway.config import GatewayConfig
+from book_api_gateway.server import PUBLIC, ROUTE_ACCESS, SERVICE, create_server
 
 EXPECTED = {
     "/healthz": (PUBLIC, {"GET"}),

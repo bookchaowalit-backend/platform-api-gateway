@@ -42,10 +42,11 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from book_api_gateway import server as gateway_server  # noqa: E402
-from book_api_gateway.config import GatewayConfig  # noqa: E402
-from book_api_gateway.server import FORWARD_HEADERS, PUBLIC, ROUTE_ACCESS, create_server  # noqa: E402
-from test_gateway import RecordingUpstreamServer, start_server  # noqa: E402
+from test_gateway import RecordingUpstreamServer, start_server
+
+from book_api_gateway import server as gateway_server
+from book_api_gateway.config import GatewayConfig
+from book_api_gateway.server import FORWARD_HEADERS, PUBLIC, ROUTE_ACCESS, create_server
 
 FIXTURE_PATH = ROOT / "fixtures" / "gates" / "webhook-provider-map.json"
 SOURCES_PATH = ROOT / "fixtures" / "gates" / "webhook-provider-sources.json"

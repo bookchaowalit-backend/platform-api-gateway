@@ -7,19 +7,18 @@ import sys
 import threading
 import time
 import unittest
-from unittest import mock
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from unittest import mock
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
-
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from book_api_gateway.config import ConfigError, GatewayConfig  # noqa: E402
-from book_api_gateway.limiter import FixedWindowRateLimiter  # noqa: E402
-from book_api_gateway.server import create_server, upstream_tcp_probe  # noqa: E402
+from book_api_gateway.config import ConfigError, GatewayConfig
+from book_api_gateway.limiter import FixedWindowRateLimiter
+from book_api_gateway.server import create_server, upstream_tcp_probe
 
 
 class RecordingUpstreamHandler(BaseHTTPRequestHandler):
@@ -66,10 +65,10 @@ class RecordingUpstreamHandler(BaseHTTPRequestHandler):
         except BrokenPipeError:
             pass
 
-    def do_GET(self) -> None:  # noqa: N802
+    def do_GET(self) -> None:
         self._respond()
 
-    def do_POST(self) -> None:  # noqa: N802
+    def do_POST(self) -> None:
         self._respond()
 
     def log_message(self, *_args: object) -> None:
@@ -121,7 +120,7 @@ def raw_exchange(port: int, payload: bytes, *, wait: float = 0.3) -> bytes:
                 if not chunk:
                     break
                 chunks.append(chunk)
-        except socket.timeout:
+        except TimeoutError:
             pass
     return b"".join(chunks)
 
@@ -415,10 +414,12 @@ class GatewayTests(unittest.TestCase):
 
     def test_upstream_timeout_must_be_finite(self) -> None:
         for raw in ("nan", "NaN", "inf", "-inf", "Infinity"):
-            with self.subTest(raw=raw):
-                with mock.patch.dict(os.environ, {"UPSTREAM_TIMEOUT_SECONDS": raw, "UPSTREAM_BASE_URL": "http://127.0.0.1:9000"}):
-                    with self.assertRaises(ConfigError):
-                        GatewayConfig.from_env()
+            with (
+                self.subTest(raw=raw),
+                mock.patch.dict(os.environ, {"UPSTREAM_TIMEOUT_SECONDS": raw, "UPSTREAM_BASE_URL": "http://127.0.0.1:9000"}),
+                self.assertRaises(ConfigError),
+            ):
+                GatewayConfig.from_env()
         for value in (float("nan"), float("inf")):
             with self.assertRaises(ConfigError):
                 GatewayConfig(api_token=self.token, upstream_timeout_seconds=value)

@@ -7,7 +7,6 @@ import os
 from dataclasses import dataclass, field
 from urllib.parse import SplitResult, urlsplit, urlunsplit
 
-
 DEFAULT_ALLOWED_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
 
 
@@ -118,7 +117,7 @@ class GatewayConfig:
         )
 
     @classmethod
-    def from_env(cls) -> "GatewayConfig":
+    def from_env(cls) -> GatewayConfig:
         """Build settings from environment variables without printing secrets."""
 
         raw_hosts = os.getenv("UPSTREAM_ALLOWED_HOSTS", "")

@@ -22,7 +22,6 @@ from urllib.request import HTTPRedirectHandler, Request, build_opener
 from .config import GatewayConfig
 from .limiter import FixedWindowRateLimiter
 
-
 REQUEST_ID_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}")
 CONTENT_LENGTH_RE = re.compile(r"[0-9]{1,19}")
 FORWARD_HEADERS = ("Accept", "Content-Type", "If-Match", "If-None-Match")
@@ -353,7 +352,7 @@ class GatewayRequestHandler(BaseHTTPRequestHandler):
                     request_id,
                     content_type=content_type,
                 )
-        except (socket.timeout, TimeoutError):
+        except TimeoutError:
             return self._error(504, "upstream timeout", request_id)
         except HTTPError as exc:
             exc.close()
@@ -373,7 +372,7 @@ class GatewayRequestHandler(BaseHTTPRequestHandler):
         self._body_consumed = False
         try:
             self._dispatch(request_id)
-        except Exception:
+        except Exception:  # noqa: BLE001 - last-resort 500; details stay out of the response
             # Keep unexpected implementation/configuration details out of the
             # response and out of telemetry. The request remains traceable by ID.
             self._error(500, "gateway error", request_id)
@@ -390,7 +389,7 @@ class GatewayRequestHandler(BaseHTTPRequestHandler):
                 event["subject_hash"] = self._subject_hash
             try:
                 self.state.telemetry_sink(event)
-            except Exception:
+            except Exception:  # noqa: BLE001, S110 - telemetry must never break a request
                 pass
 
     def _route_class(self) -> str:
@@ -406,25 +405,25 @@ class GatewayRequestHandler(BaseHTTPRequestHandler):
             return "api"
         return "other"
 
-    def do_GET(self) -> None:  # noqa: N802
+    def do_GET(self) -> None:
         self._handle_request()
 
-    def do_HEAD(self) -> None:  # noqa: N802
+    def do_HEAD(self) -> None:
         self._handle_request()
 
-    def do_POST(self) -> None:  # noqa: N802
+    def do_POST(self) -> None:
         self._handle_request()
 
-    def do_PUT(self) -> None:  # noqa: N802
+    def do_PUT(self) -> None:
         self._handle_request()
 
-    def do_PATCH(self) -> None:  # noqa: N802
+    def do_PATCH(self) -> None:
         self._handle_request()
 
-    def do_DELETE(self) -> None:  # noqa: N802
+    def do_DELETE(self) -> None:
         self._handle_request()
 
-    def do_OPTIONS(self) -> None:  # noqa: N802
+    def do_OPTIONS(self) -> None:
         self._handle_request()
 
     def log_message(self, *_args: Any) -> None:
