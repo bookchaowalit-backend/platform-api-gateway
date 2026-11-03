@@ -74,6 +74,26 @@ class Verify(unittest.TestCase):
         with self.assertRaises(TokenError):
             v.verify(self.other.sign(claims(), header={"kid": None}))
 
+    def test_jwks_key_without_kid_verifies_kid_less_tokens_only(self):
+        keys = StaticKeys([self.key])
+        keys._fetch = lambda _url: {"keys": [{k: v for k, v in self.key.jwk().items() if k != "kid"}]}
+        v = TokenVerifier({ISS: keys})
+        self.assertEqual(v.verify(self.key.sign(claims(), header={"kid": None})).subject, "user-1")
+        with self.assertRaises(TokenError):
+            v.verify(self.key.sign(claims()))  # a token naming a kid never matches an unnamed key
+
+    def test_times_must_be_finite_numbers(self):
+        now = int(time.time())
+        for name, overrides in {
+            "exp Infinity": {"exp": float("inf")},
+            "exp NaN": {"exp": float("nan")},
+            "exp true": {"exp": True},
+            "nbf -Infinity": {"nbf": float("-inf")},
+            "iat NaN": {"iat": float("nan"), "exp": now + 300},
+        }.items():
+            with self.subTest(name), self.assertRaises(TokenError):
+                self.verifier().verify(self.key.sign(claims(**overrides)))
+
     def test_tampered_payload_fails(self):
         token = self.key.sign(claims())
         head, _, sig = token.split(".")

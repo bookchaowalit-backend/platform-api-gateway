@@ -11,6 +11,7 @@ import base64
 import binascii
 import hashlib
 import json
+import math
 import threading
 import time
 from collections.abc import Callable
@@ -34,6 +35,11 @@ class TokenError(Exception):
 
 class KeysUnavailable(Exception):
     """The issuer's keys could not be loaded, so no verdict is possible (503)."""
+
+
+def _timestamp(value: Any) -> bool:
+    """A NumericDate: a finite number, never a bool (json accepts NaN and Infinity)."""
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
 
 
 @dataclass(frozen=True)
@@ -86,6 +92,8 @@ class IssuerKeys:
         self.jwks_url = jwks_url
         self._fetch = fetch
         self._keys: dict[str, tuple[int, int]] = {}
+        # Keys published without a kid: only kid-less tokens are tried against them.
+        self._unnamed: list[tuple[int, int]] = []
         self._loaded_at = 0.0
         self._attempted_at = 0.0
         self._lock = threading.Lock()
@@ -97,44 +105,49 @@ class IssuerKeys:
         """
         if self._attempted_at and now - self._attempted_at <= REFETCH_MIN_SECONDS:
             return False
-        stale = not self._keys or now - self._loaded_at > KEYS_TTL_SECONDS
+        stale = not (self._keys or self._unnamed) or now - self._loaded_at > KEYS_TTL_SECONDS
         return stale or (kid is not None and kid not in self._keys)
 
     def _load(self, now: float) -> None:
         self._attempted_at = now
         try:
             document = self._fetch(self.jwks_url)
-            keys = {}
+            keys: dict[str, tuple[int, int]] = {}
+            unnamed: list[tuple[int, int]] = []
             for jwk in document.get("keys", []):
-                if jwk.get("kty") == "RSA" and jwk.get("kid") and jwk.get("alg", "RS256") == "RS256":
+                if jwk.get("kty") == "RSA" and jwk.get("alg", "RS256") == "RS256":
                     n = int.from_bytes(_b64decode(jwk["n"]), "big")
                     e = int.from_bytes(_b64decode(jwk["e"]), "big")
-                    if n.bit_length() >= 2048:
+                    if n.bit_length() < 2048:
+                        continue
+                    if jwk.get("kid"):
                         keys[str(jwk["kid"])] = (n, e)
+                    else:
+                        unnamed.append((n, e))
         except Exception as exc:
-            if not self._keys:
+            if not (self._keys or self._unnamed):
                 raise KeysUnavailable("issuer keys unavailable") from exc
             return  # keep the last good keys
         # A successful answer is the issuer's current key set, even when empty: an issuer that
         # withdraws every key must not keep being trusted with the old ones. Only a failed fetch
         # (above) keeps the last good keys.
-        self._keys, self._loaded_at = keys, now
+        self._keys, self._unnamed, self._loaded_at = keys, unnamed, now
 
     def all_keys(self) -> list[tuple[int, int]]:
         with self._lock:
             now = time.monotonic()
             if self._due(now):
                 self._load(now)
-            if not self._keys:
+            if not (self._keys or self._unnamed):
                 raise KeysUnavailable("issuer keys unavailable")
-            return list(self._keys.values())[:MAX_KEYS_WITHOUT_KID]
+            return [*self._keys.values(), *self._unnamed][:MAX_KEYS_WITHOUT_KID]
 
     def key(self, kid: str) -> tuple[int, int] | None:
         with self._lock:
             now = time.monotonic()
             if self._due(now, kid):
                 self._load(now)
-            if not self._keys:
+            if not (self._keys or self._unnamed):
                 raise KeysUnavailable("issuer keys unavailable")
             return self._keys.get(kid)
 
@@ -164,10 +177,10 @@ class TokenVerifier:
             raise TokenError("bad signature")
         now = time.time() if now is None else now
         exp, nbf, iat = claims.get("exp"), claims.get("nbf"), claims.get("iat")
-        if not isinstance(exp, (int, float)) or exp <= now - SKEW_SECONDS:
+        if not _timestamp(exp) or exp <= now - SKEW_SECONDS:
             raise TokenError("expired")
         for value in (nbf, iat):
-            if value is not None and (not isinstance(value, (int, float)) or value > now + SKEW_SECONDS):
+            if value is not None and (not _timestamp(value) or value > now + SKEW_SECONDS):
                 raise TokenError("not yet valid")
         subject, audience = claims.get("sub"), claims.get("aud")
         if not isinstance(subject, str) or not subject or not audience:
