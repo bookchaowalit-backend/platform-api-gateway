@@ -30,7 +30,7 @@ Consumers move one at a time; the direct service URLs keep working until a cutov
 - Repository: `platform-api-gateway`
 - Target remote: `https://github.com/bookchaowalit-backend/platform-api-gateway.git` (Railway project `platform-api-gateway`, service `gateway`, CLI deploy of `git archive main`)
 - Contract: `book-platform.contract.v1`
-- Status: `active` (edge `/v1/` live 2026-11-03 at `https://gateway.bookchaowalit.com`; pilot `/api/*` unset in production)
+- Status: `pilot` (contract stage, as for the other live Book Platform services; the edge `/v1/` has been live since 2026-11-03 at `https://gateway.bookchaowalit.com`, and the pilot `/api/*` is unset in production)
 - Data owner: the platform boundary identified in `contract.json`
 
 The platform communicates through versioned API or event contracts. Consumers
