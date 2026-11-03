@@ -129,7 +129,8 @@
       "If-None-Match",
       "Idempotency-Key",
       "X-Empire-Channel",
-      "X-Correlation-Id"
+      "X-Correlation-Id",
+      "X-Workspace-Authorization"
     ],
     "edge_forwards_signature_headers": false
   },

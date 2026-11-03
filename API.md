@@ -103,7 +103,8 @@ document, read by the MCP hub's `describe_cell`): edge lock and path rules still
 limited per client IP, and only `Accept` is forwarded.
 
 Forwarded to the upstream: `Authorization`, `Accept`, `Content-Type`, `If-Match`,
-`If-None-Match`, `Idempotency-Key`, `X-Empire-Channel`, `X-Correlation-Id` and the gateway's
+`If-None-Match`, `Idempotency-Key`, `X-Empire-Channel`, `X-Correlation-Id`,
+`X-Workspace-Authorization` (platform-data caller JWT) and the gateway's
 `X-Request-ID`; never the edge header.
 The upstream's status and body come back unchanged (errors included); kept response headers:
 `Content-Type`, `ETag`, `Retry-After`, `WWW-Authenticate`, and `Location` only when it stays on

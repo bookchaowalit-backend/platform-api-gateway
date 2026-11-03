@@ -31,9 +31,10 @@ if TYPE_CHECKING:
 EDGE_HEADER = "X-Gateway-Edge"
 METHODS = frozenset({"GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"})
 # X-Empire-Channel and X-Correlation-Id are first-party: cells pass the channel on to the platform
-# audit and use the correlation id to tie a caller's requests together.
+# audit and use the correlation id to tie a caller's requests together. X-Workspace-Authorization is
+# the caller's own signed JWT that platform-data verifies separately from the service token.
 FORWARD_REQUEST = ("Authorization", "Accept", "Content-Type", "If-Match", "If-None-Match", "Idempotency-Key",
-                   "X-Empire-Channel", "X-Correlation-Id")
+                   "X-Empire-Channel", "X-Correlation-Id", "X-Workspace-Authorization")
 FORWARD_RESPONSE = ("ETag", "Retry-After", "WWW-Authenticate")
 MAX_QUERY_CHARS = 2048
 CONTENT_LENGTH_RE = re.compile(r"[0-9]{1,19}")
