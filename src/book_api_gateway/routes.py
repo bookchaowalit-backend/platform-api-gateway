@@ -30,7 +30,11 @@ def load_routes(path: Path = DEFAULT_ROUTES) -> dict[str, Route]:
         raise RouteError(f"cannot read route table {path.name}") from exc
     routes = {}
     for system, base in raw.items():
-        parts = urlsplit(base)
+        try:
+            parts = urlsplit(base)
+            parts.port  # noqa: B018 - raises ValueError for a port outside 0-65535 or not a number
+        except (ValueError, TypeError, AttributeError) as exc:
+            raise RouteError(f"invalid route {system!r}") from exc
         if (not ID_RE.fullmatch(system) or parts.scheme != "https" or not parts.hostname
                 or parts.path not in ("", "/") or parts.query or parts.fragment or parts.username):
             raise RouteError(f"invalid route {system!r}")

@@ -136,9 +136,12 @@ def _rewrite_location(location: str, route: Route, request_url: str) -> str | No
     Origins are compared normalised (scheme, lower-case host, default port), so `HOST:443` and
     upper-case spellings of the upstream still count as the same upstream.
     """
-    absolute = urlsplit(urljoin(request_url, location))
-    if _origin(absolute.geturl()) != _origin(route.base_url):
-        return None  # another host: never pass a redirect off-route
+    try:
+        absolute = urlsplit(urljoin(request_url, location))
+        if _origin(absolute.geturl()) != _origin(route.base_url):
+            return None  # another host: never pass a redirect off-route
+    except ValueError:
+        return None  # malformed (bad IPv6 literal or port): drop the header, keep the response
     rest = absolute.path or "/"
     if absolute.query:
         rest += "?" + absolute.query

@@ -74,6 +74,8 @@ class Upstream(BaseHTTPRequestHandler):
             self.send_header("Location", f"HTTP://{host}/items/3?x=1")
         elif self.path.startswith("/away"):
             self.send_header("Location", "https://elsewhere.example/x")
+        elif self.path.startswith("/broken"):
+            self.send_header("Location", "http://[::1/x")  # invalid IPv6 literal
         self.send_header("Content-Length", str(len(payload)))
         self.end_headers()
         self.wfile.write(payload)
@@ -179,6 +181,9 @@ class Edge(unittest.TestCase):
         _, headers, _ = self.call("/v1/habits/port", token=self.good())
         self.assertEqual(headers["Location"], "/v1/habits/items/3?x=1")
         _, headers, _ = self.call("/v1/habits/away", token=self.good())
+        self.assertIsNone(headers.get("Location"))
+        status, headers, _ = self.call("/v1/habits/broken", token=self.good())
+        self.assertEqual(status, 200)  # the response still comes back, without the bad Location
         self.assertIsNone(headers.get("Location"))
 
     def test_largest_accepted_token_is_forwarded(self):

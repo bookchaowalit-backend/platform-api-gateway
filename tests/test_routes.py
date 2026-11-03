@@ -47,7 +47,8 @@ class Load(unittest.TestCase):
 
     def test_rejects_unsafe_entries(self):
         for bad in ({"x": "https://a.example"}, {"ok-id": "http://a.example"}, {"ok-id": "https://u@a.example"},
-                    {"ok-id": "https://a.example/path"}, {}):
+                    {"ok-id": "https://a.example/path"}, {"ok-id": "https://a.example:99999"},
+                    {"ok-id": "https://a.example:port"}, {}):
             with self.subTest(bad), self.assertRaises(RouteError):
                 load_routes(self.write(bad))
 
