@@ -23,23 +23,31 @@ def system_key(master: bytes, system: str) -> bytes:
     return hmac.new(master, f"gateway-assertion/v1/{system}".encode(), hashlib.sha256).digest()
 
 
-def _signed_text(system: str, method: str, target: str, iat: int, request_id: str, authorization: str) -> bytes:
-    auth_hash = hashlib.sha256(authorization.encode("utf-8", "surrogateescape")).hexdigest()
-    return "\n".join(("gw1", system, method.upper(), target, str(iat), request_id, auth_hash)).encode(
-        "utf-8", "surrogateescape")
+def _sha(value: bytes | str) -> str:
+    data = value if isinstance(value, bytes) else value.encode("utf-8", "surrogateescape")
+    return hashlib.sha256(data).hexdigest()
+
+
+def _signed_text(system: str, method: str, target: str, iat: int, request_id: str, authorization: str,
+                 content_type: str, body: bytes) -> bytes:
+    fields = ("gw1", system, method.upper(), target, str(iat), request_id, _sha(authorization), _sha(content_type),
+              _sha(body))
+    return "\n".join(fields).encode("utf-8", "surrogateescape")
 
 
 def _b64(data: bytes) -> str:
     return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
 
 
-def sign(key: bytes, system: str, method: str, target: str, iat: int, request_id: str, authorization: str) -> str:
-    mac = hmac.new(key, _signed_text(system, method, target, iat, request_id, authorization), hashlib.sha256)
+def sign(key: bytes, system: str, method: str, target: str, iat: int, request_id: str, authorization: str,
+         content_type: str = "", body: bytes = b"") -> str:
+    text = _signed_text(system, method, target, iat, request_id, authorization, content_type, body)
+    mac = hmac.new(key, text, hashlib.sha256)
     return f"{VERSION}.{iat}.{_b64(request_id.encode())}.{_b64(mac.digest())}"
 
 
 def verify(key: bytes, system: str, header: str | None, method: str, target: str, authorization: str,
-           now: float) -> str:
+           now: float, content_type: str = "", body: bytes = b"") -> str:
     """'valid', 'missing' or 'invalid' (malformed, stale or a wrong MAC)."""
     if not header:
         return "missing"
@@ -53,7 +61,7 @@ def verify(key: bytes, system: str, header: str | None, method: str, target: str
         return "invalid"
     if abs(now - iat) > MAX_SKEW_SECONDS:
         return "invalid"
-    expected = sign(key, system, method, target, iat, request_id, authorization)
+    expected = sign(key, system, method, target, iat, request_id, authorization, content_type, body)
     return "valid" if hmac.compare_digest(expected.encode(), header.strip().encode()) else "invalid"
 
 

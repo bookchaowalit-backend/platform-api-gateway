@@ -240,7 +240,8 @@ def _proxy(h: GatewayRequestHandler, edge: EdgeSettings, route: Route, target: s
     if edge.assertion_master is not None:
         key = assertion.system_key(edge.assertion_master, route.system)
         headers[assertion.HEADER] = assertion.sign(key, route.system, h.command, target, int(time.time()),
-                                                   request_id, headers.get("Authorization", ""))
+                                                   request_id, headers.get("Authorization", ""),
+                                                   headers.get("Content-Type", ""), body)
     request = Request(route.base_url + target, data=body if body or h.command in {"POST", "PUT", "PATCH"} else None,
                       headers=headers, method=h.command)
     limit = h.state.config.max_body_bytes

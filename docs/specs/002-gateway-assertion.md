@@ -32,10 +32,11 @@ which is how the remaining direct callers are found before a service switches to
 - **R2 What is signed.** One line per field, joined by `\n`: `gw1`, the system id, the method,
   the target exactly as forwarded (raw path tail plus `?query` when present), the issue time
   (Unix seconds), the gateway request id, and the SHA-256 hex of the forwarded `Authorization`
-  value (empty string when none). The header is `v1.<iat>.<base64url request id>.<base64url HMAC>` (the request id
+  value, the forwarded `Content-Type` value and the exact forwarded body (each the hash of the
+  empty string when absent). The header is `v1.<iat>.<base64url request id>.<base64url HMAC>` (the request id
   is encoded because a caller-supplied `X-Request-ID` may contain `.` and `:`).
-  The body is not signed: the assertion proves the route through the edge, the bearer token
-  still proves the caller.
+  The assertion proves the request passed the edge unchanged; the bearer token still proves the
+  caller. Within the 60 s window a captured assertion can only replay the identical request.
 - **R3 Gateway.** When the master key is set, every proxied request carries the header,
   computed after the forwarded headers are chosen. A caller's own `X-Gateway-Assertion` is never
   forwarded (it is not in the forwarded set). Without the master key nothing is added (SPEC-001
@@ -58,7 +59,8 @@ which is how the remaining direct callers are found before a service switches to
 
 - AC1 With the master key set, a request through the gateway reaches the upstream with a header
   the service's key verifies; the same header fails against another system's key.
-- AC2 Changing the method, the target, the request id or the `Authorization` value, or moving
+- AC2 Changing the method, the target, the request id, the `Authorization` or `Content-Type`
+  value or the body, or moving
   `iat` more than 60 s, makes the check fail.
 - AC3 A caller-supplied `X-Gateway-Assertion` never reaches the upstream.
 - AC4 Service in `enforce`: missing or invalid gives 403 and the route does not run; health and
@@ -73,5 +75,5 @@ which is how the remaining direct callers are found before a service switches to
 
 ## Out of scope
 
-Body signing, replay caches (the 60 s window plus the bound token and request id are the limit),
+Replay caches (the 60 s window plus the bound token, request id, body and target are the limit),
 mTLS, and private networking between the gateway and the services.

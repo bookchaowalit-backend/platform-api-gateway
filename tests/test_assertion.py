@@ -44,6 +44,26 @@ class Reference(unittest.TestCase):
         forged = ".".join(other_rid.split(".")[:3] + [self.header.split(".")[3]])
         self.assertEqual(self.check(header=forged), "invalid")
 
+    def test_ac2_body_and_content_type_are_bound(self):
+        h = assertion.sign(self.key, "habits", "POST", "/v1/habits", self.now, "r", "Bearer t", "application/json",
+                           b'{"a":1}')
+        ok = ("POST", "/v1/habits", "Bearer t", self.now)
+        self.assertEqual(assertion.verify(self.key, "habits", h, *ok, "application/json", b'{"a":1}'), "valid")
+        self.assertEqual(assertion.verify(self.key, "habits", h, *ok, "application/json", b'{"a":2}'), "invalid")
+        self.assertEqual(assertion.verify(self.key, "habits", h, *ok, "text/plain", b'{"a":1}'), "invalid")
+        self.assertEqual(assertion.verify(self.key, "habits", h, *ok), "invalid")
+
+    def test_pinned_vectors(self):
+        # The services' copies pin these same strings; change both sides together.
+        key = assertion.system_key(bytes(range(32)), "habits")
+        self.assertEqual(key.hex(), "fe0cf5b8aad53ea81449701c218d54e663bc33d864842e739bcef8742d94a56f")
+        self.assertEqual(assertion.sign(key, "habits", "GET", "/v1/habits?status=active", 1793700000, "req.1:a",
+                                        "Bearer t"),
+                         "v1.1793700000.cmVxLjE6YQ.FIYOR4VOYVb7_PhDWnTiFqxKyHEqUxDcs1B8dB7b0sE")
+        self.assertEqual(assertion.sign(key, "habits", "POST", "/v1/habits", 1793700000, "req.1:a", "Bearer t",
+                                        "application/json", b'{"name":"run"}'),
+                         "v1.1793700000.cmVxLjE6YQ._L2Jgjl5CrbW9qTdTfgvtGubyou3nkRZHXmFKZrxsm8")
+
     def test_ac2_sixty_second_window(self):
         self.assertEqual(self.check(now=self.now + 60), "valid")
         self.assertEqual(self.check(now=self.now - 60), "valid")
@@ -90,6 +110,17 @@ class SignedEdge(Edge):
         result = assertion.verify(key, "habits", rec["headers"].get("x-gateway-assertion"), "GET",
                                   "/items?x=1", f"Bearer {token}", time.time())
         self.assertEqual(result, "valid")
+
+    def test_ac1_post_body_is_covered(self):
+        token = self.good()
+        self.call("/v1/habits/items", token=token, method="POST", body=b'{"a":1}',
+                  headers={"Content-Type": "application/json"})
+        rec = self.upstream.records[-1]
+        key = assertion.system_key(MASTER, "habits")
+        args = (key, "habits", rec["headers"].get("x-gateway-assertion"), "POST", "/items", f"Bearer {token}",
+                time.time(), "application/json")
+        self.assertEqual(assertion.verify(*args, b'{"a":1}'), "valid")
+        self.assertEqual(assertion.verify(*args, b'{"a":2}'), "invalid")
 
     def test_ac3_caller_assertion_is_replaced(self):
         self.call("/v1/habits/items", token=self.good(), headers={"X-Gateway-Assertion": "v1.1.YQ.forged"})
