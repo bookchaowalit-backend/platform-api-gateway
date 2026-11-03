@@ -33,6 +33,7 @@
   "platform-developer": "https://developer-api-production-2fad.up.railway.app",
   "platform-logistics": "https://logistics-api-production-d3bb.up.railway.app",
   "platform-media": "https://media-api-production-91a5.up.railway.app",
+  "platform-payment": "https://payment-api-production-3a91.up.railway.app",
   "platform-security": "https://security-api-production-f817.up.railway.app",
   "platform-workflow": "https://workflow-api-production-63de.up.railway.app",
   "projects": "https://projects-api-production-f4eb.up.railway.app",
