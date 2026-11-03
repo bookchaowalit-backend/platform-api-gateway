@@ -3,7 +3,7 @@
   "schema_version": "book-platform.contract.v1",
   "platform_id": "api-gateway",
   "repository": "platform-api-gateway",
-  "status": "pilot",
+  "status": "active",
   "api_version": "v1",
   "data_owner": "none",
   "capabilities": [
@@ -25,10 +25,10 @@
     "source_status": "current-implementation-in-solo-empire"
   },
   "migration": {
-    "compatibility_adapter": "local HTTP adapter only",
-    "shadow_parity": "pending: compare infra/api/server.ts responses",
-    "cutover": "pending",
-    "rollback": "required"
+    "compatibility_adapter": "none: consumers call gateway.bookchaowalit.com/v1/<system>/ directly",
+    "shadow_parity": "2026-11-03: empire-platform, habits, goals, diary returned identical status and body size direct vs gateway; platform-security audit read 200 via Cloudflare",
+    "cutover": "per consumer; none recorded yet",
+    "rollback": "point the consumer back at the direct registry URL (unchanged)"
   },
   "migration_gates": [
     "versioned route contract",

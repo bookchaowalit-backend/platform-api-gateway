@@ -19,7 +19,7 @@ from typing import Any
 # --- Repository-specific settings -------------------------------------------
 # Everything below this block is shared verbatim across Book Platform
 # repositories; keep local differences inside this block.
-ALLOWED_STATUS = frozenset({"pilot"})
+ALLOWED_STATUS = frozenset({"pilot", "active"})  # active since the SPEC-001 edge went live (2026-11-03)
 IMPLEMENTATION_REPOSITORIES = frozenset({"solo-empire"})
 EXTRA_REQUIRED_FILES: tuple[str, ...] = (
     "API.md",
