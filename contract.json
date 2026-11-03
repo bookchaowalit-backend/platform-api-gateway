@@ -27,7 +27,7 @@
   "migration": {
     "compatibility_adapter": "none: consumers call gateway.bookchaowalit.com/v1/<system>/ directly",
     "shadow_parity": "2026-11-03: empire-platform, habits, goals, diary returned identical status and body size direct vs gateway; platform-security audit read 200 via Cloudflare",
-    "cutover": "per consumer; none recorded yet",
+    "cutover": "per consumer: platform-posture-monitor security-api audit (2026-11-03); owner CLI client.env, 10 cells (2026-11-03; crm-ledger and knowledge stay direct: not platform RS256 tokens)",
     "rollback": "point the consumer back at the direct registry URL (unchanged)"
   },
   "migration_gates": [

@@ -73,9 +73,13 @@ def _unsafe_api_path(path: str) -> bool:
 
 
 def _default_telemetry(event: dict[str, Any]) -> None:
-    """Emit only already-redacted event fields to stderr."""
+    """Emit only already-redacted event fields to stdout.
 
-    print(json.dumps(event, separators=(",", ":"), sort_keys=True), file=sys.stderr, flush=True)
+    stdout, not stderr: Railway labels every stderr line as an error, which made each request
+    look like a failure. Startup and configuration errors still go to stderr.
+    """
+
+    print(json.dumps(event, separators=(",", ":"), sort_keys=True), file=sys.stdout, flush=True)
 
 
 def upstream_tcp_probe(base_url: str, timeout_seconds: float) -> bool:

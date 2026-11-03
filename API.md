@@ -108,7 +108,7 @@ the same upstream (rewritten to `/v1/<system>/…`). Connection errors are 502, 
 `X-Request-ID`, `Strict-Transport-Security: max-age=31536000`,
 `X-Content-Type-Options: nosniff` and `Cache-Control: no-store`.
 
-Telemetry adds `system` and the hashed `iss`+`sub` to `request.completed`; tokens, path tails,
+Telemetry (one JSON line per request on stdout) adds `system` and the hashed `iss`+`sub` to `request.completed`; tokens, path tails,
 query strings and bodies are never logged.
 
 | Variable | Meaning |
