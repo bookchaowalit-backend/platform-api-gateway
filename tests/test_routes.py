@@ -67,3 +67,25 @@ class Match(unittest.TestCase):  # AC4 (unknown system)
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Redirects(unittest.TestCase):
+    def test_same_upstream_spellings_are_kept_and_others_dropped(self):
+        from book_api_gateway.edge import _rewrite_location
+        from book_api_gateway.routes import Route
+
+        route = Route("habits", "https://h.example", "h.example")
+        req = "https://h.example/v1/items/1"
+        cases = {
+            "/v1/items/2": "/v1/habits/v1/items/2",
+            "next": "/v1/habits/v1/items/next",
+            "HTTPS://H.EXAMPLE:443/a?b=1": "/v1/habits/a?b=1",
+            "https://h.example": "/v1/habits/",
+            "https://h.example:8443/a": None,
+            "http://h.example/a": None,
+            "https://evil.example/a": None,
+            "//evil.example/a": None,
+        }
+        for location, expected in cases.items():
+            with self.subTest(location):
+                self.assertEqual(_rewrite_location(location, route, req), expected)

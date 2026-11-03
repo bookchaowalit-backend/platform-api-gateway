@@ -68,6 +68,9 @@ class Upstream(BaseHTTPRequestHandler):
             self.send_header("Location", "/items/2")
         elif self.path.startswith("/rel/"):
             self.send_header("Location", "next")  # relative to /rel/
+        elif self.path.startswith("/port"):
+            host = f"127.0.0.1:{self.server.server_port}".upper()
+            self.send_header("Location", f"HTTP://{host}/items/3?x=1")
         elif self.path.startswith("/away"):
             self.send_header("Location", "https://elsewhere.example/x")
         self.send_header("Content-Length", str(len(payload)))
@@ -170,8 +173,22 @@ class Edge(unittest.TestCase):
         self.assertEqual(headers["Location"], "/v1/habits/items/2")
         _, headers, _ = self.call("/v1/habits/rel/item", token=self.good())
         self.assertEqual(headers["Location"], "/v1/habits/rel/next")
+        _, headers, _ = self.call("/v1/habits/port", token=self.good())
+        self.assertEqual(headers["Location"], "/v1/habits/items/3?x=1")
         _, headers, _ = self.call("/v1/habits/away", token=self.good())
         self.assertIsNone(headers.get("Location"))
+
+    def test_largest_accepted_token_is_forwarded(self):
+        # Size the token so "Bearer " + token is over 8192 while the token itself is accepted.
+        pad = 5600
+        token = self.good(pad="p" * pad)
+        while len(token) <= 8192 - 7 or len(token) > 8192:
+            pad += 1 if len(token) <= 8192 - 7 else -1
+            token = self.good(pad="p" * pad)
+        self.assertGreater(len("Bearer " + token), 8192)
+        status, _, _ = self.call("/v1/habits/items", token=token)
+        self.assertEqual(status, 200)
+        self.assertEqual(self.upstream.records[-1]["headers"]["authorization"], f"Bearer {token}")
 
     def test_not_modified_passes_through(self):
         status, headers, body = self.call("/v1/habits/not-modified", token=self.good(),

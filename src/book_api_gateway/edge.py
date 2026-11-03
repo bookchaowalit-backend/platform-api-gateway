@@ -15,7 +15,13 @@ from urllib.parse import unquote, urljoin, urlsplit
 from urllib.request import Request
 
 from .config import ConfigError
-from .jwt_verify import IssuerKeys, KeysUnavailable, TokenError, TokenVerifier
+from .jwt_verify import (
+    MAX_TOKEN_CHARS,
+    IssuerKeys,
+    KeysUnavailable,
+    TokenError,
+    TokenVerifier,
+)
 from .limiter import FixedWindowRateLimiter
 from .routes import Route, load_routes, match
 
@@ -111,12 +117,29 @@ def _clean(value: str | None, limit: int = 512) -> str | None:
     return value
 
 
+def _origin(url: str) -> tuple[str, str, int] | None:
+    parts = urlsplit(url)
+    if parts.scheme not in {"http", "https"} or not parts.hostname:
+        return None
+    try:
+        port = parts.port or (443 if parts.scheme == "https" else 80)
+    except ValueError:
+        return None
+    return parts.scheme, parts.hostname.lower(), port
+
+
 def _rewrite_location(location: str, route: Route, request_url: str) -> str | None:
-    """Resolve the redirect against the upstream request (relative forms included); keep it only on-route."""
-    absolute = urljoin(request_url, location)
-    if absolute != route.base_url and not absolute.startswith(route.base_url + "/"):
+    """Resolve the redirect against the upstream request (relative forms included); keep it only on-route.
+
+    Origins are compared normalised (scheme, lower-case host, default port), so `HOST:443` and
+    upper-case spellings of the upstream still count as the same upstream.
+    """
+    absolute = urlsplit(urljoin(request_url, location))
+    if _origin(absolute.geturl()) != _origin(route.base_url):
         return None  # another host: never pass a redirect off-route
-    rest = absolute[len(route.base_url):] or "/"
+    rest = absolute.path or "/"
+    if absolute.query:
+        rest += "?" + absolute.query
     return f"/v1/{route.system}{rest}"
 
 
@@ -187,7 +210,9 @@ def _read_body(h: GatewayRequestHandler, request_id: str) -> bytes | None:
 
 def _proxy(h: GatewayRequestHandler, edge: EdgeSettings, route: Route, target: str, body: bytes,
            request_id: str) -> int:
-    headers = {name: v for name in FORWARD_REQUEST if (v := _clean(h.headers.get(name), 8192)) is not None}
+    # Room for "Bearer " plus the largest token the verifier accepts, so a valid token is never dropped.
+    limit_header = MAX_TOKEN_CHARS + 64
+    headers = {name: v for name in FORWARD_REQUEST if (v := _clean(h.headers.get(name), limit_header)) is not None}
     headers["X-Request-ID"] = request_id
     request = Request(route.base_url + target, data=body if body or h.command in {"POST", "PUT", "PATCH"} else None,
                       headers=headers, method=h.command)
