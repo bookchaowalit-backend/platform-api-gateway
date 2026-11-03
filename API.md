@@ -80,7 +80,11 @@ values or upstream response bodies.
 
 ## Edge routes (`/v1/`, SPEC-001)
 
-Production ingress is `https://gateway.bookchaowalit.com`, proxied by Cloudflare. The
+Production ingress is `https://gateway.bookchaowalit.com`, proxied by Cloudflare. Zone rules for
+this host only: a request-header Transform Rule sets `X-Gateway-Edge`; a Configuration Rule turns
+Browser Integrity Check off (it answered 403 to API clients with default user agents such as
+`Python-urllib`); one rate-limit rule (60 requests / 10 s per IP and colo). First consumer:
+platform-posture-monitor's security-api audit calls (2026-11-03). The
 `/v1/` route class exists only when `GATEWAY_TRUSTED_ISSUERS` is set; the full requirements
 and acceptance criteria are in [docs/specs/001-edge-gateway.md](docs/specs/001-edge-gateway.md).
 
