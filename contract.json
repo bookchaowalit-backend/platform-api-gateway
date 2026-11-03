@@ -26,8 +26,8 @@
   },
   "migration": {
     "compatibility_adapter": "none: consumers call gateway.bookchaowalit.com/v1/<system>/ directly",
-    "shadow_parity": "2026-11-03: empire-platform, habits, goals, diary returned identical status and body size direct vs gateway; platform-security audit read 200 via Cloudflare",
-    "cutover": "per consumer, 2026-11-03: platform-posture-monitor (security-api audit); owner CLI and local MCP servers (client.env, 10 cells; crm-ledger and knowledge stay direct: not platform RS256 tokens); remote MCP hub platform-mcp-remote-worker (all 29 cells; describe_cell via the tokenless /openapi.json path)",
+    "shadow_parity": "2026-11-03: empire-platform, habits, goals, diary returned identical status and body size direct vs gateway; platform-security audit read 200 via Cloudflare; owner-web token: 16/16 owner-web reads (14 cells) identical status and size direct vs gateway",
+    "cutover": "per consumer, 2026-11-03: platform-posture-monitor (security-api audit); owner CLI and local MCP servers (client.env, 10 cells; crm-ledger and knowledge stay direct: not platform RS256 tokens); remote MCP hub platform-mcp-remote-worker (all 29 cells; describe_cell via the tokenless /openapi.json path); owner-web on Vercel (solo-web-one, 14 cells via Production env, redeployed 2026-11-03; crm-ledger stays direct: CRM owner token)",
     "rollback": "point the consumer back at the direct registry URL (unchanged)"
   },
   "migration_gates": [
