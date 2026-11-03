@@ -98,6 +98,10 @@ and acceptance criteria are in [docs/specs/001-edge-gateway.md](docs/specs/001-e
 | Subject limit | per `iss`+`sub`, default 120/min | 429 with `Retry-After` |
 | Body | ≤ 1 MiB, no chunked encoding | 411 / 413 / 400 |
 
+The one tokenless path is `GET`/`HEAD /v1/<system>/openapi.json` (the cells' public OpenAPI
+document, read by the MCP hub's `describe_cell`): edge lock and path rules still apply, it is
+limited per client IP, and only `Accept` is forwarded.
+
 Forwarded to the upstream: `Authorization`, `Accept`, `Content-Type`, `If-Match`,
 `If-None-Match`, `Idempotency-Key`, `X-Empire-Channel`, `X-Correlation-Id` and the gateway's
 `X-Request-ID`; never the edge header.

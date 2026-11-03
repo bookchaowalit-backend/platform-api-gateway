@@ -44,6 +44,8 @@ ROUTE_ACCESS: dict[str, tuple[str, frozenset[str]]] = {
     "/readyz": (PUBLIC, frozenset({"GET"})),
     "/api/*": (SERVICE, ALLOWED_METHODS),
     "/v1/*": (PLATFORM_TOKEN, EDGE_METHODS),
+    # The cells' public OpenAPI document, through the edge lock but without a token (SPEC-001 R3a).
+    "/v1/*/openapi.json": (PUBLIC, frozenset({"GET", "HEAD"})),
 }
 TelemetrySink = Callable[[dict[str, Any]], None]
 

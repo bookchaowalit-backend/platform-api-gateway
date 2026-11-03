@@ -33,6 +33,7 @@ EXPECTED = {
     "/readyz": (PUBLIC, {"GET"}),
     "/api/*": (SERVICE, {"GET", "POST"}),
     "/v1/*": (PLATFORM_TOKEN, {"GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"}),
+    "/v1/*/openapi.json": (PUBLIC, {"GET", "HEAD"}),
 }
 SAMPLE_PATHS = {"/healthz": "/healthz", "/readyz": "/readyz", "/api/*": "/api/demo/items"}
 SAFE_METHODS = {"GET", "HEAD"}
@@ -85,8 +86,8 @@ class RouteAccessMatrixTests(unittest.TestCase):
     def test_every_route_method_and_caller(self) -> None:
         callers = {"anonymous": None, "wrong-token": "Bearer wrong", "service": f"Bearer {TOKEN}"}
         for route, (level, methods) in ROUTE_ACCESS.items():
-            if level == PLATFORM_TOKEN:
-                continue  # needs the edge and signed tokens: driven method by method in test_edge.py
+            if route.startswith("/v1/"):
+                continue  # edge routes exist only with the edge configured: driven in test_edge.py
             path = SAMPLE_PATHS[route]
             for method in ALL_METHODS:
                 for caller, authorization in callers.items():

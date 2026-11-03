@@ -46,6 +46,10 @@ until a consumer cutover is recorded (rollback = point the consumer back).
   (60 s skew), `sub` and `aud` present. JWKS are cached 10 minutes and refetched at most once a
   minute for an unknown `kid`. When no issuer's keys can be loaded the answer is 503, never a
   pass. The token is forwarded unchanged; audience and scope stay the service's decision.
+- **R3a Public OpenAPI.** `GET`/`HEAD /v1/<system>/openapi.json` is the one path without a
+  token: the cells publish it unauthenticated and the MCP hub's `describe_cell` reads it tokenless.
+  The edge lock and path rules still apply; it is limited per client IP; only `Accept` is
+  forwarded (never `Authorization`).
 - **R4 Limits.** Failed tokens per client IP (default 10/min → 429 for the rest of the window);
   accepted requests per `iss`+`sub` (default 120/min). Bodies up to 1 MiB, query strings up to
   2048 characters, no chunked bodies, upstream redirects disabled, upstream timeout 30 s

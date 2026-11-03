@@ -465,6 +465,8 @@ class GatewaySourceCoverageTests(unittest.TestCase):
             with self.subTest(literal=literal):
                 prefix = literal.rstrip("*").rstrip("/")
                 normalized = f"{prefix}/*" if prefix in {"/api", "/v1"} else literal
+                if literal == "/openapi.json":
+                    normalized = "/v1/*/openapi.json"  # edge.PUBLIC_OPENAPI lives under /v1/<system>/
                 self.assertIn(normalized, covered)
 
     def test_contract_json_interfaces_are_mapped(self) -> None:

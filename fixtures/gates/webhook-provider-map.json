@@ -85,6 +85,14 @@
           "PUT"
         ],
         "external_provider_ingress": false
+      },
+      "/v1/*/openapi.json": {
+        "access": "public",
+        "methods": [
+          "GET",
+          "HEAD"
+        ],
+        "external_provider_ingress": false
       }
     },
     "contract_interfaces": {

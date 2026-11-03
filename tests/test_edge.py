@@ -219,6 +219,16 @@ class Edge(unittest.TestCase):
                 self.assertEqual(headers["WWW-Authenticate"], "Bearer")
         self.assertEqual(self.upstream.records, [])
 
+    def test_openapi_is_the_only_tokenless_path(self):
+        status, _, _ = self.call("/v1/habits/openapi.json", headers={"Authorization": "Bearer junk"})
+        self.assertEqual(status, 200)
+        rec = self.upstream.records[-1]
+        self.assertEqual(rec["path"], "/openapi.json")
+        self.assertNotIn("authorization", rec["headers"])  # never forwarded on the public path
+        self.assertEqual(self.call("/v1/habits/openapi.json", method="POST", body=b"{}")[0], 401)
+        self.assertEqual(self.call("/v1/habits/x/openapi.json")[0], 401)
+        self.assertEqual(self.call("/v1/habits/openapi.json", edge=False)[0], 403)
+
     def test_ac3_direct_access_is_refused(self):
         status, _, body = self.call("/v1/habits/items", token=self.good(), edge=False)
         self.assertEqual((status, json.loads(body)["error"]), (403, "direct access not allowed"))

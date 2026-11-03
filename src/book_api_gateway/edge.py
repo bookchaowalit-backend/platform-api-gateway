@@ -37,6 +37,7 @@ FORWARD_REQUEST = ("Authorization", "Accept", "Content-Type", "If-Match", "If-No
 FORWARD_RESPONSE = ("ETag", "Retry-After", "WWW-Authenticate")
 MAX_QUERY_CHARS = 2048
 CONTENT_LENGTH_RE = re.compile(r"[0-9]{1,19}")
+PUBLIC_OPENAPI = "/openapi.json"  # the only tokenless /v1/<system>/ path (GET/HEAD)
 IP_RE = re.compile(r"[0-9a-fA-F:.]{2,45}")
 
 
@@ -165,6 +166,15 @@ def handle_v1(h: GatewayRequestHandler, edge: EdgeSettings, request_id: str, pat
         return h._error(429, "too many failed authentication attempts", request_id,
                         extra_headers={"Retry-After": str(locked_for)})
 
+    if rest == PUBLIC_OPENAPI and h.command in {"GET", "HEAD"}:
+        # The cells publish /openapi.json without auth; the hub's describe_cell reads it tokenless on
+        # purpose. Edge lock and path rules above still apply; limited per client IP; nothing forwarded
+        # but the safe headers (no Authorization).
+        allowed, retry_after = edge.subject_limiter.allow("public:" + client)
+        if not allowed:
+            return h._error(429, "rate limit exceeded", request_id, extra_headers={"Retry-After": str(retry_after)})
+        return _proxy(h, edge, route, rest + (f"?{query}" if query else ""), b"", request_id, public=True)
+
     scheme, _, token = h.headers.get("Authorization", "").partition(" ")
     try:
         if scheme.casefold() != "bearer" or not token:
@@ -209,10 +219,11 @@ def _read_body(h: GatewayRequestHandler, request_id: str) -> bytes | None:
 
 
 def _proxy(h: GatewayRequestHandler, edge: EdgeSettings, route: Route, target: str, body: bytes,
-           request_id: str) -> int:
+           request_id: str, *, public: bool = False) -> int:
     # Room for "Bearer " plus the largest token the verifier accepts, so a valid token is never dropped.
     limit_header = MAX_TOKEN_CHARS + 64
-    headers = {name: v for name in FORWARD_REQUEST if (v := _clean(h.headers.get(name), limit_header)) is not None}
+    names = ("Accept",) if public else FORWARD_REQUEST
+    headers = {name: v for name in names if (v := _clean(h.headers.get(name), limit_header)) is not None}
     headers["X-Request-ID"] = request_id
     request = Request(route.base_url + target, data=body if body or h.command in {"POST", "PUT", "PATCH"} else None,
                       headers=headers, method=h.command)
