@@ -89,6 +89,44 @@ class Verify(unittest.TestCase):
         with self.assertRaises(KeysUnavailable):
             self.verifier(fail=True).verify(self.key.sign(claims()))
 
+    def test_down_issuer_is_fetched_at_most_once_a_minute(self):
+        keys = StaticKeys([self.key], fail=True)
+        v = TokenVerifier({ISS: keys})
+        for _ in range(5):
+            with self.assertRaises(KeysUnavailable):
+                v.verify(self.key.sign(claims()))
+        self.assertEqual(keys.fetches, 1)
+        keys._attempted_at -= 61
+        keys.fail = False
+        self.assertEqual(v.verify(self.key.sign(claims())).subject, "user-1")
+        self.assertEqual(keys.fetches, 2)
+
+    def test_stale_keys_survive_a_failed_refresh_without_refetch_storms(self):
+        keys = StaticKeys([self.key])
+        v = TokenVerifier({ISS: keys})
+        v.verify(self.key.sign(claims()))
+        keys.fail = True
+        keys._loaded_at -= 601
+        keys._attempted_at -= 601
+        for _ in range(3):
+            v.verify(self.key.sign(claims()))  # last good keys keep working
+        self.assertEqual(keys.fetches, 2)
+
+    def test_deeply_nested_json_is_a_token_error(self):
+        # Unreachable through verify() (MAX_TOKEN_CHARS caps nesting near 3,000, the parser copes up to
+        # ~100,000), but a part that does recurse too deep must stay a 401, never a 500.
+        from jwt_fixtures import b64url
+
+        from book_api_gateway.jwt_verify import _json_part
+
+        with self.assertRaises(TokenError):
+            _json_part(b64url(("[" * 200000 + "]" * 200000).encode()))
+
+        nested = b64url(("[" * 2000 + "]" * 2000).encode())  # under MAX_TOKEN_CHARS, over the recursion limit
+        head = b64url(b'{"alg":"RS256","kid":"k1"}')
+        with self.assertRaises(TokenError):
+            self.verifier().verify(f"{head}.{nested}.sig")
+
     def test_keys_are_cached_and_unknown_kid_refetch_is_throttled(self):
         keys = StaticKeys([self.key])
         v = TokenVerifier({ISS: keys})

@@ -10,7 +10,7 @@ import re
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 from urllib.error import HTTPError, URLError
-from urllib.parse import unquote, urlsplit
+from urllib.parse import unquote, urljoin, urlsplit
 from urllib.request import Request
 
 from .config import ConfigError
@@ -107,12 +107,13 @@ def _clean(value: str | None, limit: int = 512) -> str | None:
     return value
 
 
-def _rewrite_location(location: str, route: Route) -> str | None:
-    if location.startswith(route.base_url + "/"):
-        location = location[len(route.base_url):]
-    if location.startswith("/") and not location.startswith("//"):
-        return f"/v1/{route.system}{location}"
-    return None  # another host: never pass a redirect off-route
+def _rewrite_location(location: str, route: Route, request_url: str) -> str | None:
+    """Resolve the redirect against the upstream request (relative forms included); keep it only on-route."""
+    absolute = urljoin(request_url, location)
+    if absolute != route.base_url and not absolute.startswith(route.base_url + "/"):
+        return None  # another host: never pass a redirect off-route
+    rest = absolute[len(route.base_url):] or "/"
+    return f"/v1/{route.system}{rest}"
 
 
 def handle_v1(h: GatewayRequestHandler, edge: EdgeSettings, request_id: str, path: str, query: str) -> int:
@@ -208,7 +209,12 @@ def _proxy(h: GatewayRequestHandler, edge: EdgeSettings, route: Route, target: s
         return h._error(502, "upstream response too large", request_id)
     extra = {name: v for name in FORWARD_RESPONSE if (v := _clean(upstream_headers.get(name))) is not None}
     location = _clean(upstream_headers.get("Location"), 2048)
-    if location and (rewritten := _rewrite_location(location, route)):
+    if location and (rewritten := _rewrite_location(location, route, route.base_url + target)):
         extra["Location"] = rewritten
     content_type = _clean(upstream_headers.get("Content-Type"), 200) or "application/octet-stream"
-    return h._send_bytes(status, payload, request_id, content_type=content_type, extra_headers=extra)
+    head_length = None
+    if h.command == "HEAD":  # no body to measure: report the upstream's length, as a GET would
+        declared = upstream_headers.get("Content-Length", "")
+        head_length = int(declared) if CONTENT_LENGTH_RE.fullmatch(declared.strip()) else None
+    return h._send_bytes(status, payload, request_id, content_type=content_type, extra_headers=extra,
+                         content_length=head_length)

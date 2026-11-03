@@ -35,9 +35,20 @@ class Upstream(BaseHTTPRequestHandler):
         self.send_header("Set-Cookie", "upstream=1")
         if self.path.startswith("/moved"):
             self.send_header("Location", "/items/2")
+        elif self.path.startswith("/rel/"):
+            self.send_header("Location", "next")  # relative to /rel/
+        elif self.path.startswith("/away"):
+            self.send_header("Location", "https://elsewhere.example/x")
         self.send_header("Content-Length", str(len(payload)))
         self.end_headers()
         self.wfile.write(payload)
+
+    def do_HEAD(self):
+        self.server.records.append({"method": "HEAD", "path": self.path, "body": b"", "headers": {}})
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", "1234")
+        self.end_headers()
 
     do_GET = do_POST = do_PUT = do_PATCH = do_DELETE = _respond
 
@@ -123,6 +134,14 @@ class Edge(unittest.TestCase):
     def test_location_is_rewritten_to_the_gateway_path(self):
         _, headers, _ = self.call("/v1/habits/moved", token=self.good())
         self.assertEqual(headers["Location"], "/v1/habits/items/2")
+        _, headers, _ = self.call("/v1/habits/rel/item", token=self.good())
+        self.assertEqual(headers["Location"], "/v1/habits/rel/next")
+        _, headers, _ = self.call("/v1/habits/away", token=self.good())
+        self.assertIsNone(headers.get("Location"))
+
+    def test_head_keeps_the_upstream_length(self):
+        status, headers, body = self.call("/v1/habits/items", token=self.good(), method="HEAD")
+        self.assertEqual((status, headers["Content-Length"], body), (200, "1234", b""))
 
     def test_ac2_bad_tokens_never_reach_upstream(self):
         bad = (None, "junk", self.other.sign(claims(issuer=ISS)), self.key.sign(claims(issuer="https://evil")),

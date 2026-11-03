@@ -52,7 +52,7 @@ def _b64decode(part: str) -> bytes:
 def _json_part(part: str) -> dict[str, Any]:
     try:
         value = json.loads(_b64decode(part))
-    except (UnicodeDecodeError, ValueError) as exc:
+    except (UnicodeDecodeError, ValueError, RecursionError) as exc:  # deep nesting is junk, not a 500
         raise TokenError("malformed token") from exc
     if not isinstance(value, dict):
         raise TokenError("malformed token")
@@ -90,6 +90,16 @@ class IssuerKeys:
         self._attempted_at = 0.0
         self._lock = threading.Lock()
 
+    def _due(self, now: float, kid: str | None = None) -> bool:
+        """Fetch only when keys are missing, stale or lack this kid, and never twice within a minute.
+
+        A down issuer would otherwise be fetched on every request (latency plus load on it).
+        """
+        if self._attempted_at and now - self._attempted_at <= REFETCH_MIN_SECONDS:
+            return False
+        stale = not self._keys or now - self._loaded_at > KEYS_TTL_SECONDS
+        return stale or (kid is not None and kid not in self._keys)
+
     def _load(self, now: float) -> None:
         self._attempted_at = now
         try:
@@ -113,15 +123,19 @@ class IssuerKeys:
     def all_keys(self) -> list[tuple[int, int]]:
         with self._lock:
             now = time.monotonic()
-            if not self._keys or now - self._loaded_at > KEYS_TTL_SECONDS:
+            if self._due(now):
                 self._load(now)
+            if not self._keys:
+                raise KeysUnavailable("issuer keys unavailable")
             return list(self._keys.values())[:MAX_KEYS_WITHOUT_KID]
 
     def key(self, kid: str) -> tuple[int, int] | None:
         with self._lock:
             now = time.monotonic()
-            if not self._keys or now - self._loaded_at > KEYS_TTL_SECONDS or kid not in self._keys and now - self._attempted_at > REFETCH_MIN_SECONDS:
+            if self._due(now, kid):
                 self._load(now)
+            if not self._keys:
+                raise KeysUnavailable("issuer keys unavailable")
             return self._keys.get(kid)
 
 

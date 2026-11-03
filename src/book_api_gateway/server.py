@@ -156,6 +156,7 @@ class GatewayRequestHandler(BaseHTTPRequestHandler):
         *,
         content_type: str = "application/json",
         extra_headers: dict[str, str] | None = None,
+        content_length: int | None = None,
     ) -> int:
         if not 100 <= status <= 599:
             status = 502
@@ -167,7 +168,7 @@ class GatewayRequestHandler(BaseHTTPRequestHandler):
         self._last_status = status
         self.send_response(status)
         self.send_header("Content-Type", content_type)
-        self.send_header("Content-Length", str(len(payload)))
+        self.send_header("Content-Length", str(len(payload) if content_length is None else content_length))
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Request-ID", request_id)
         self.send_header("Strict-Transport-Security", "max-age=31536000")
