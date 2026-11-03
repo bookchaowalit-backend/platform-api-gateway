@@ -27,12 +27,13 @@ A boundary contract with offline evidence, not a running service. A dependency-f
 
 ## Operating Context
 
-- Status: `pilot (local only)`; DOCPACK verdict: `showcase`. The runtime is not activated; the current
-  implementation is `infra/api/server.ts` in the parent registry.
+- Status: contract `pilot`; the runtime is live since 2026-11-03 at `https://gateway.bookchaowalit.com`
+  (Railway, Singapore, behind Cloudflare with the `X-Gateway-Edge` origin lock and a rate-limit rule;
+  SPEC-001). Consumers move one at a time; rollback is pointing a consumer back at its direct URL.
 - CI: shared `ci-python` (Ruff and `scripts/check.sh` on Python 3.11 and 3.12) and the shared
-  security workflow, on GitHub-hosted runners (public repository).
-- Sentry does not apply: nothing runs in production. Add it in the change that activates a
-  runtime.
+  security workflow, on GitHub-hosted runners (public repository). Deploys are Railway CLI uploads.
+
+Sentry waiver: SPEC-001 R8 keeps the gateway standard-library only (no sentry-sdk) and R7 keeps exception text out of telemetry; every failure is a `request.completed` line on stdout with its status (500/502) and request id in the Railway logs, and the uptime worker checks the gateway hourly.
 - The open `codex/shared-infrastructure-20261015` pull request (decision D8) is outside this
   document.
 
