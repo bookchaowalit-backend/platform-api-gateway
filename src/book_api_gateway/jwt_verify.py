@@ -39,7 +39,11 @@ class KeysUnavailable(Exception):
 
 def _timestamp(value: Any) -> bool:
     """A NumericDate: a finite number, never a bool (json accepts NaN and Infinity)."""
-    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+    if isinstance(value, bool):
+        return False
+    if isinstance(value, int):
+        return True  # math.isfinite would raise OverflowError past float range; ints are always finite
+    return isinstance(value, float) and math.isfinite(value)
 
 
 @dataclass(frozen=True)

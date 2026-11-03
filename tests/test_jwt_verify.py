@@ -94,6 +94,12 @@ class Verify(unittest.TestCase):
             with self.subTest(name), self.assertRaises(TokenError):
                 self.verifier().verify(self.key.sign(claims(**overrides)))
 
+    def test_huge_integer_times_are_a_token_error_not_a_crash(self):
+        with self.assertRaises(TokenError):  # nbf far in the future: not yet valid, no OverflowError
+            self.verifier().verify(self.key.sign(claims(nbf=10**400)))
+        with self.assertRaises(TokenError):
+            self.verifier().verify(self.key.sign(claims(exp=-(10**400))))
+
     def test_tampered_payload_fails(self):
         token = self.key.sign(claims())
         head, _, sig = token.split(".")
