@@ -196,7 +196,7 @@ def _proxy(h: GatewayRequestHandler, edge: EdgeSettings, route: Route, target: s
         response: Any = h.state.opener.open(request, timeout=edge.upstream_timeout_seconds)
     except HTTPError as exc:
         response = exc  # 3xx/4xx/5xx: the upstream's answer, passed through
-    except (TimeoutError, URLError, OSError, ValueError) as exc:
+    except (TimeoutError, URLError, OSError, ValueError, HTTPException) as exc:  # HTTPException: BadStatusLine…
         reason = getattr(exc, "reason", exc)
         if isinstance(exc, TimeoutError) or isinstance(reason, TimeoutError):
             return h._error(504, "upstream timeout", request_id)
@@ -205,16 +205,18 @@ def _proxy(h: GatewayRequestHandler, edge: EdgeSettings, route: Route, target: s
         payload = response.read(limit + 1)
         status = int(response.getcode() if hasattr(response, "getcode") else response.code)
         upstream_headers = response.headers
-    except (TimeoutError, OSError):
+    except TimeoutError:
         return h._error(504, "upstream timeout", request_id)
-    except HTTPException:  # IncompleteRead and friends: a cut-off answer is not an answer
+    except (OSError, HTTPException):  # reset mid-body, IncompleteRead…: a cut-off answer is not an answer
         return h._error(502, "upstream response incomplete", request_id)
     finally:
         response.close()
     if len(payload) > limit:
         return h._error(502, "upstream response too large", request_id)
     declared = (upstream_headers.get("Content-Length") or "").strip()
-    if h.command != "HEAD" and CONTENT_LENGTH_RE.fullmatch(declared) and int(declared) != len(payload):
+    # HEAD, 204 and 304 carry no body even when Content-Length describes the representation.
+    bodyless = h.command == "HEAD" or status in {204, 304}
+    if not bodyless and CONTENT_LENGTH_RE.fullmatch(declared) and int(declared) != len(payload):
         return h._error(502, "upstream response incomplete", request_id)
     extra = {name: v for name in FORWARD_RESPONSE if (v := _clean(upstream_headers.get(name))) is not None}
     location = _clean(upstream_headers.get("Location"), 2048)

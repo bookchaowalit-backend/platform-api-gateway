@@ -23,6 +23,29 @@ SECRET = "edge-secret-for-tests"
 
 class Upstream(BaseHTTPRequestHandler):
     def _respond(self):
+        if self.path.startswith("/not-modified"):
+            self.send_response(304)
+            self.send_header("ETag", '"v1"')
+            self.send_header("Content-Length", "1234")  # the representation's length, no body
+            self.end_headers()
+            return
+        if self.path.startswith("/garbage"):
+            self.wfile.write(b"NOT-HTTP\r\n\r\n")  # a broken status line
+            self.close_connection = True
+            return
+        if self.path.startswith("/reset"):
+            import socket
+            import struct
+
+            self.send_response(200)
+            self.send_header("Content-Length", "1000")
+            self.end_headers()
+            self.wfile.write(b"x" * 10)
+            self.wfile.flush()
+            self.connection.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1, 0))
+            self.connection.close()  # RST mid-body
+            self.close_connection = True
+            return
         if self.path.startswith("/short"):
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
@@ -149,6 +172,16 @@ class Edge(unittest.TestCase):
         self.assertEqual(headers["Location"], "/v1/habits/rel/next")
         _, headers, _ = self.call("/v1/habits/away", token=self.good())
         self.assertIsNone(headers.get("Location"))
+
+    def test_not_modified_passes_through(self):
+        status, headers, body = self.call("/v1/habits/not-modified", token=self.good(),
+                                          headers={"If-None-Match": '"v1"'})
+        self.assertEqual((status, headers["ETag"], body), (304, '"v1"', b""))
+
+    def test_protocol_and_reset_errors_are_502_not_500_or_504(self):
+        for path in ("/v1/habits/garbage", "/v1/habits/reset"):
+            with self.subTest(path):
+                self.assertEqual(self.call(path, token=self.good())[0], 502)
 
     def test_truncated_upstream_answer_is_502(self):
         status, _, body = self.call("/v1/habits/short", token=self.good())
