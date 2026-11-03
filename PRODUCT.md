@@ -33,7 +33,7 @@ A boundary contract with offline evidence, not a running service. A dependency-f
 - CI: shared `ci-python` (Ruff and `scripts/check.sh` on Python 3.11 and 3.12) and the shared
   security workflow, on GitHub-hosted runners (public repository). Deploys are Railway CLI uploads.
 
-Sentry waiver: SPEC-001 R8 keeps the gateway standard-library only (no sentry-sdk) and R7 keeps exception text out of telemetry; every failure is a `request.completed` line on stdout with its status (500/502) and request id in the Railway logs, and the uptime worker checks the gateway hourly.
+Sentry waiver: SPEC-001 R8 keeps the gateway standard-library only (no sentry-sdk) and R7 keeps exception text out of telemetry; since c998368 every failure is a `request.completed` line on stdout with its status (500, 502 incl. "upstream response incomplete", 504) and request id in the Railway logs, and the uptime worker checks the gateway hourly.
 - The open `codex/shared-infrastructure-20261015` pull request (decision D8) is outside this
   document.
 
