@@ -112,6 +112,16 @@ class Verify(unittest.TestCase):
             v.verify(self.key.sign(claims()))  # last good keys keep working
         self.assertEqual(keys.fetches, 2)
 
+    def test_empty_key_set_withdraws_trust(self):
+        keys = StaticKeys([self.key])
+        v = TokenVerifier({ISS: keys})
+        v.verify(self.key.sign(claims()))
+        keys.keys = []  # the issuer withdrew every key
+        keys._loaded_at -= 601
+        keys._attempted_at -= 601
+        with self.assertRaises(KeysUnavailable):
+            v.verify(self.key.sign(claims()))
+
     def test_deeply_nested_json_is_a_token_error(self):
         # Unreachable through verify() (MAX_TOKEN_CHARS caps nesting near 3,000, the parser copes up to
         # ~100,000), but a part that does recurse too deep must stay a 401, never a 500.

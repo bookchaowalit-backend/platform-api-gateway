@@ -23,6 +23,14 @@ SECRET = "edge-secret-for-tests"
 
 class Upstream(BaseHTTPRequestHandler):
     def _respond(self):
+        if self.path.startswith("/short"):
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", "100")
+            self.end_headers()
+            self.wfile.write(b'{"partial":')  # then the connection closes
+            self.close_connection = True
+            return
         length = int(self.headers.get("Content-Length", "0"))
         body = self.rfile.read(length) if length else b""
         self.server.records.append({"method": self.command, "path": self.path, "body": body,
@@ -138,6 +146,10 @@ class Edge(unittest.TestCase):
         self.assertEqual(headers["Location"], "/v1/habits/rel/next")
         _, headers, _ = self.call("/v1/habits/away", token=self.good())
         self.assertIsNone(headers.get("Location"))
+
+    def test_truncated_upstream_answer_is_502(self):
+        status, _, body = self.call("/v1/habits/short", token=self.good())
+        self.assertEqual((status, json.loads(body)["error"]), (502, "upstream response incomplete"))
 
     def test_head_keeps_the_upstream_length(self):
         status, headers, body = self.call("/v1/habits/items", token=self.good(), method="HEAD")

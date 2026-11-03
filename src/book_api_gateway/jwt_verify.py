@@ -115,10 +115,10 @@ class IssuerKeys:
             if not self._keys:
                 raise KeysUnavailable("issuer keys unavailable") from exc
             return  # keep the last good keys
-        if not keys and not self._keys:
-            raise KeysUnavailable("issuer published no usable keys")
-        if keys:
-            self._keys, self._loaded_at = keys, now
+        # A successful answer is the issuer's current key set, even when empty: an issuer that
+        # withdraws every key must not keep being trusted with the old ones. Only a failed fetch
+        # (above) keeps the last good keys.
+        self._keys, self._loaded_at = keys, now
 
     def all_keys(self) -> list[tuple[int, int]]:
         with self._lock:

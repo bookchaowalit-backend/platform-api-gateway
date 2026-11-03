@@ -8,6 +8,7 @@ import json
 import os
 import re
 from dataclasses import dataclass, field
+from http.client import HTTPException
 from typing import TYPE_CHECKING, Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import unquote, urljoin, urlsplit
@@ -203,10 +204,15 @@ def _proxy(h: GatewayRequestHandler, edge: EdgeSettings, route: Route, target: s
         upstream_headers = response.headers
     except (TimeoutError, OSError):
         return h._error(504, "upstream timeout", request_id)
+    except HTTPException:  # IncompleteRead and friends: a cut-off answer is not an answer
+        return h._error(502, "upstream response incomplete", request_id)
     finally:
         response.close()
     if len(payload) > limit:
         return h._error(502, "upstream response too large", request_id)
+    declared = (upstream_headers.get("Content-Length") or "").strip()
+    if h.command != "HEAD" and CONTENT_LENGTH_RE.fullmatch(declared) and int(declared) != len(payload):
+        return h._error(502, "upstream response incomplete", request_id)
     extra = {name: v for name in FORWARD_RESPONSE if (v := _clean(upstream_headers.get(name))) is not None}
     location = _clean(upstream_headers.get("Location"), 2048)
     if location and (rewritten := _rewrite_location(location, route, route.base_url + target)):
