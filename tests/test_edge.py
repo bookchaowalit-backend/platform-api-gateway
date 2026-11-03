@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import threading
+import time
 import unittest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.error import HTTPError
@@ -273,7 +274,13 @@ class Edge(unittest.TestCase):
 
     def test_telemetry_never_carries_token_or_path_tail(self):
         token = self.good()
+        self.events.clear()
         self.call("/v1/habits/secret-path?q=private", token=token)
+        # Telemetry is emitted after the response is flushed; wait instead of racing the handler.
+        deadline = time.monotonic() + 2.0
+        while not self.events and time.monotonic() < deadline:
+            time.sleep(0.01)
+        self.assertTrue(self.events)
         event = self.events[-1]
         self.assertEqual((event["route"], event["system"], event["status"]), ("v1", "habits", 200))
         text = json.dumps(event)
