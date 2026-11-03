@@ -36,6 +36,7 @@ class TestKey:
 
     def sign(self, claims: dict, header: dict | None = None) -> str:
         head = {"alg": "RS256", "typ": "JWT", "kid": self.kid, **(header or {})}
+        head = {k: v for k, v in head.items() if v is not None}
         signing_input = f"{b64url(json.dumps(head).encode())}.{b64url(json.dumps(claims).encode())}"
         sig = subprocess.run(
             ["openssl", "dgst", "-sha256", "-sign", self.path],

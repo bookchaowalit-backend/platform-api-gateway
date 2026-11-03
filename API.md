@@ -90,7 +90,7 @@ and acceptance criteria are in [docs/specs/001-edge-gateway.md](docs/specs/001-e
 | Path | no dot segments, backslashes, encoded slashes or control characters; query ≤ 2048 characters | 400 |
 | Route | `<system>` is in `routes.json` (generated from the registry: online systems with an https URL, minus web frontends, `identity` and `ai-gateway`) | 404 |
 | Client lock | failed tokens per client IP (`CF-Connecting-IP`, trusted only behind the edge lock), default 10/min | 429 |
-| Token | RS256, `kid`, trusted `iss` (`GATEWAY_TRUSTED_ISSUERS`: issuer → JWKS URL), valid signature, `exp`/`nbf`/`iat` within 60 s skew, `sub` and `aud` present | 401 (`WWW-Authenticate: Bearer`); 503 when no key of the issuer can be loaded |
+| Token | RS256 (`kid`, or each published key when the token has none), trusted `iss` (`GATEWAY_TRUSTED_ISSUERS`: issuer → JWKS URL), valid signature, `exp`/`nbf`/`iat` within 60 s skew, `sub` and `aud` present | 401 (`WWW-Authenticate: Bearer`); 503 when no key of the issuer can be loaded |
 | Subject limit | per `iss`+`sub`, default 120/min | 429 with `Retry-After` |
 | Body | ≤ 1 MiB, no chunked encoding | 411 / 413 / 400 |
 

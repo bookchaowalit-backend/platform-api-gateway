@@ -65,6 +65,15 @@ class Verify(unittest.TestCase):
             with self.subTest(name), self.assertRaises(TokenError):
                 v.verify(token)
 
+    def test_token_without_kid_tries_each_issuer_key(self):
+        # empire-platform tokens carry no kid; cells try their rollover keys in turn.
+        second = TestKey("k2")
+        v = self.verifier(keys=[second, self.key])
+        principal = v.verify(self.key.sign(claims(), header={"kid": None}))
+        self.assertEqual(principal.subject, "user-1")
+        with self.assertRaises(TokenError):
+            v.verify(self.other.sign(claims(), header={"kid": None}))
+
     def test_tampered_payload_fails(self):
         token = self.key.sign(claims())
         head, _, sig = token.split(".")

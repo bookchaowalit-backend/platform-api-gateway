@@ -22,6 +22,8 @@ SKEW_SECONDS = 60
 KEYS_TTL_SECONDS = 600
 REFETCH_MIN_SECONDS = 60
 MAX_TOKEN_CHARS = 8192
+# A token without kid (empire-platform) is tried against each published key, like the cells' rollover keys.
+MAX_KEYS_WITHOUT_KID = 8
 # DER prefix of DigestInfo for SHA-256 (RFC 8017 §9.2, note 1).
 SHA256_PREFIX = bytes.fromhex("3031300d060960864801650304020105000420")
 
@@ -108,6 +110,13 @@ class IssuerKeys:
         if keys:
             self._keys, self._loaded_at = keys, now
 
+    def all_keys(self) -> list[tuple[int, int]]:
+        with self._lock:
+            now = time.monotonic()
+            if not self._keys or now - self._loaded_at > KEYS_TTL_SECONDS:
+                self._load(now)
+            return list(self._keys.values())[:MAX_KEYS_WITHOUT_KID]
+
     def key(self, kid: str) -> tuple[int, int] | None:
         with self._lock:
             now = time.monotonic()
@@ -125,17 +134,19 @@ class TokenVerifier:
             raise TokenError("malformed token")
         head_part, claims_part, sig_part = token.split(".")
         header = _json_part(head_part)
-        if header.get("alg") != "RS256" or not isinstance(header.get("kid"), str):
+        kid = header.get("kid")
+        if header.get("alg") != "RS256" or (kid is not None and not isinstance(kid, str)):
             raise TokenError("unsupported token")
         claims = _json_part(claims_part)
         issuer = claims.get("iss")
         keys = self.issuers.get(issuer) if isinstance(issuer, str) else None
         if keys is None:
             raise TokenError("untrusted issuer")
-        key = keys.key(header["kid"])
-        if key is None:
+        candidates = keys.all_keys() if kid is None else [k for k in [keys.key(kid)] if k is not None]
+        if not candidates:
             raise TokenError("unknown key")
-        if not rs256_valid(f"{head_part}.{claims_part}".encode("ascii"), _b64decode(sig_part), *key):
+        signing_input, signature = f"{head_part}.{claims_part}".encode("ascii"), _b64decode(sig_part)
+        if not any(rs256_valid(signing_input, signature, *key) for key in candidates):
             raise TokenError("bad signature")
         now = time.time() if now is None else now
         exp, nbf, iat = claims.get("exp"), claims.get("nbf"), claims.get("iat")

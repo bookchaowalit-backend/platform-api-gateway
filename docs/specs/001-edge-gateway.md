@@ -40,7 +40,8 @@ until a consumer cutover is recorded (rollback = point the consumer back).
   otherwise the socket peer is. `/healthz` and `/readyz` stay open for the platform
   healthcheck.
 - **R3 Token check.** A `/v1/` request needs `Authorization: Bearer <JWT>`: header `alg`
-  `RS256`, `kid` present, `iss` one of `GATEWAY_TRUSTED_ISSUERS` (issuer → JWKS URL), a valid
+  `RS256` (a token without `kid`, as empire-platform issues, is tried against each of the
+  issuer's published keys, at most 8), `iss` one of `GATEWAY_TRUSTED_ISSUERS` (issuer → JWKS URL), a valid
   signature by that issuer's key, `exp` in the future and `nbf`/`iat` not in the future
   (60 s skew), `sub` and `aud` present. JWKS are cached 10 minutes and refetched at most once a
   minute for an unknown `kid`. When no issuer's keys can be loaded the answer is 503, never a
