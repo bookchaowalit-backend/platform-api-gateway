@@ -134,10 +134,13 @@ class Edge(unittest.TestCase):
         status, _, body = self.call("/v1/habits/missing", token=self.good())
         self.assertEqual((status, json.loads(body)["status"]), (404, 404))
         status, _, _ = self.call("/v1/habits/items", token=self.good(), method="POST", body=b'{"a":1}',
-                                 headers={"Content-Type": "application/json", "Idempotency-Key": "k-1"})
+                                 headers={"Content-Type": "application/json", "Idempotency-Key": "k-1",
+                                          "X-Empire-Channel": "cli", "X-Correlation-Id": "c-1", "Cookie": "s=1"})
         self.assertEqual(status, 201)
         rec = self.upstream.records[-1]
         self.assertEqual((rec["body"], rec["headers"]["idempotency-key"]), (b'{"a":1}', "k-1"))
+        self.assertEqual((rec["headers"]["x-empire-channel"], rec["headers"]["x-correlation-id"]), ("cli", "c-1"))
+        self.assertNotIn("cookie", rec["headers"])
 
     def test_location_is_rewritten_to_the_gateway_path(self):
         _, headers, _ = self.call("/v1/habits/moved", token=self.good())

@@ -99,7 +99,8 @@ and acceptance criteria are in [docs/specs/001-edge-gateway.md](docs/specs/001-e
 | Body | ≤ 1 MiB, no chunked encoding | 411 / 413 / 400 |
 
 Forwarded to the upstream: `Authorization`, `Accept`, `Content-Type`, `If-Match`,
-`If-None-Match`, `Idempotency-Key` and the gateway's `X-Request-ID`; never the edge header.
+`If-None-Match`, `Idempotency-Key`, `X-Empire-Channel`, `X-Correlation-Id` and the gateway's
+`X-Request-ID`; never the edge header.
 The upstream's status and body come back unchanged (errors included); kept response headers:
 `Content-Type`, `ETag`, `Retry-After`, `WWW-Authenticate`, and `Location` only when it stays on
 the same upstream (rewritten to `/v1/<system>/…`). Connection errors are 502, timeouts 504

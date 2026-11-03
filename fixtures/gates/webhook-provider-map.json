@@ -119,7 +119,9 @@
       "Content-Type",
       "If-Match",
       "If-None-Match",
-      "Idempotency-Key"
+      "Idempotency-Key",
+      "X-Empire-Channel",
+      "X-Correlation-Id"
     ],
     "edge_forwards_signature_headers": false
   },

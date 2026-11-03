@@ -52,7 +52,8 @@ until a consumer cutover is recorded (rollback = point the consumer back).
   (sleeping Railway services and Neon take several seconds to wake).
 - **R5 Faithful proxy.** Methods GET, HEAD, POST, PUT, PATCH, DELETE. Request headers forwarded:
   `Authorization`, `Accept`, `Content-Type`, `If-Match`, `If-None-Match`, `Idempotency-Key`,
-  plus the gateway's `X-Request-ID`. The upstream status and body are returned as they are
+  `X-Empire-Channel`, `X-Correlation-Id` (first-party audit channel and correlation, added for the
+  owner CLI cutover), plus the gateway's `X-Request-ID`. The upstream status and body are returned as they are
   (4xx and 5xx included); response headers kept: `Content-Type`, `ETag`, `Retry-After`,
   `WWW-Authenticate`, `Location` (only when it points at the same upstream, rewritten to the
   gateway path). Connection failures are 502, timeouts 504.

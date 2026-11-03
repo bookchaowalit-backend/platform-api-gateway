@@ -24,7 +24,10 @@ if TYPE_CHECKING:
 
 EDGE_HEADER = "X-Gateway-Edge"
 METHODS = frozenset({"GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"})
-FORWARD_REQUEST = ("Authorization", "Accept", "Content-Type", "If-Match", "If-None-Match", "Idempotency-Key")
+# X-Empire-Channel and X-Correlation-Id are first-party: cells pass the channel on to the platform
+# audit and use the correlation id to tie a caller's requests together.
+FORWARD_REQUEST = ("Authorization", "Accept", "Content-Type", "If-Match", "If-None-Match", "Idempotency-Key",
+                   "X-Empire-Channel", "X-Correlation-Id")
 FORWARD_RESPONSE = ("ETag", "Retry-After", "WWW-Authenticate")
 MAX_QUERY_CHARS = 2048
 CONTENT_LENGTH_RE = re.compile(r"[0-9]{1,19}")
