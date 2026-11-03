@@ -237,13 +237,16 @@ def _proxy(h: GatewayRequestHandler, edge: EdgeSettings, route: Route, target: s
     names = ("Accept",) if public else FORWARD_REQUEST
     headers = {name: v for name in names if (v := _clean(h.headers.get(name), limit_header)) is not None}
     headers["X-Request-ID"] = request_id
+    data = body if body or h.command in {"POST", "PUT", "PATCH"} else None
+    if data is not None and "Content-Type" not in headers:
+        # urllib adds this for any request with data; set it here so the assertion signs what is sent.
+        headers["Content-Type"] = "application/x-www-form-urlencoded"
     if edge.assertion_master is not None:
         key = assertion.system_key(edge.assertion_master, route.system)
         headers[assertion.HEADER] = assertion.sign(key, route.system, h.command, target, int(time.time()),
                                                    request_id, headers.get("Authorization", ""),
                                                    headers.get("Content-Type", ""), body)
-    request = Request(route.base_url + target, data=body if body or h.command in {"POST", "PUT", "PATCH"} else None,
-                      headers=headers, method=h.command)
+    request = Request(route.base_url + target, data=data, headers=headers, method=h.command)
     limit = h.state.config.max_body_bytes
     try:
         response: Any = h.state.opener.open(request, timeout=edge.upstream_timeout_seconds)

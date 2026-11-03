@@ -70,6 +70,6 @@ def parse_master(value: str) -> bytes | None:
     value = value.strip()
     if not value:
         return None
-    if len(value) < 64 or len(value) % 2:
+    if not re.fullmatch(r"(?:[0-9a-fA-F]{2}){32,}", value):  # fromhex would skip inner whitespace
         raise ValueError("GATEWAY_ASSERTION_MASTER_KEY must be 64+ hex characters")
     return bytes.fromhex(value)

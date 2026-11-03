@@ -83,7 +83,7 @@ class Reference(unittest.TestCase):
     def test_master_key_parsing(self):
         self.assertIsNone(assertion.parse_master(""))
         self.assertEqual(assertion.parse_master(MASTER.hex()), MASTER)
-        for bad in ("ab" * 31, "zz" * 32, "abc" * 23):
+        for bad in ("ab" * 31, "zz" * 32, "abc" * 23, "00" + " " * 64 + "00", "ab" * 16 + " " + "ab" * 16):
             with self.subTest(bad), self.assertRaises(ValueError):
                 assertion.parse_master(bad)
 
@@ -121,6 +121,17 @@ class SignedEdge(Edge):
                 time.time(), "application/json")
         self.assertEqual(assertion.verify(*args, b'{"a":1}'), "valid")
         self.assertEqual(assertion.verify(*args, b'{"a":2}'), "invalid")
+
+    def test_ac1_post_without_content_type_still_verifies(self):
+        token = self.good()
+        self.call("/v1/habits/items", token=token, method="POST")  # no body, so the client sends no Content-Type
+        rec = self.upstream.records[-1]
+        sent = rec["headers"].get("content-type", "")
+        self.assertEqual(sent, "application/x-www-form-urlencoded")
+        result = assertion.verify(assertion.system_key(MASTER, "habits"), "habits",
+                                  rec["headers"].get("x-gateway-assertion"), "POST", "/items", f"Bearer {token}",
+                                  time.time(), sent, b"")
+        self.assertEqual(result, "valid")
 
     def test_ac3_caller_assertion_is_replaced(self):
         self.call("/v1/habits/items", token=self.good(), headers={"X-Gateway-Assertion": "v1.1.YQ.forged"})
