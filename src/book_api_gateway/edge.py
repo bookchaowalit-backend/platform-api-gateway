@@ -1,4 +1,4 @@
-"""`/v1/<system>/…`: edge lock, token check, limits and a faithful proxy (SPEC-001)."""
+"""`/v1/<system>/…`: edge lock, token check, limits and a faithful proxy (SPEC-001), signed (SPEC-002)."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ import hmac
 import json
 import os
 import re
+import time
 from dataclasses import dataclass, field
 from http.client import HTTPException
 from typing import TYPE_CHECKING, Any
@@ -14,6 +15,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import unquote, urljoin, urlsplit
 from urllib.request import Request
 
+from . import assertion
 from .config import ConfigError
 from .jwt_verify import (
     MAX_TOKEN_CHARS,
@@ -50,6 +52,7 @@ class EdgeSettings:
     subject_limit_per_minute: int = 120
     failure_limit_per_minute: int = 10
     upstream_timeout_seconds: float = 30.0
+    assertion_master: bytes | None = None  # SPEC-002; None = forward without an assertion
     subject_limiter: FixedWindowRateLimiter = field(init=False)
     failure_limiter: FixedWindowRateLimiter = field(init=False)
 
@@ -82,6 +85,10 @@ class EdgeSettings:
         except ValueError as exc:
             raise ConfigError(str(exc)) from exc
         verifier = TokenVerifier({iss: IssuerKeys(url) for iss, url in issuers.items()})
+        try:
+            master = assertion.parse_master(env.get("GATEWAY_ASSERTION_MASTER_KEY", ""))
+        except ValueError as exc:
+            raise ConfigError(str(exc)) from exc
         return cls(
             routes=routes,
             verifier=verifier,
@@ -89,6 +96,7 @@ class EdgeSettings:
             subject_limit_per_minute=_positive_int(env, "GATEWAY_SUBJECT_LIMIT_PER_MINUTE", 120),
             failure_limit_per_minute=_positive_int(env, "GATEWAY_FAILURE_LIMIT_PER_MINUTE", 10),
             upstream_timeout_seconds=float(_positive_int(env, "GATEWAY_UPSTREAM_TIMEOUT_SECONDS", 30)),
+            assertion_master=master,
         )
 
 
@@ -229,6 +237,10 @@ def _proxy(h: GatewayRequestHandler, edge: EdgeSettings, route: Route, target: s
     names = ("Accept",) if public else FORWARD_REQUEST
     headers = {name: v for name in names if (v := _clean(h.headers.get(name), limit_header)) is not None}
     headers["X-Request-ID"] = request_id
+    if edge.assertion_master is not None:
+        key = assertion.system_key(edge.assertion_master, route.system)
+        headers[assertion.HEADER] = assertion.sign(key, route.system, h.command, target, int(time.time()),
+                                                   request_id, headers.get("Authorization", ""))
     request = Request(route.base_url + target, data=body if body or h.command in {"POST", "PUT", "PATCH"} else None,
                       headers=headers, method=h.command)
     limit = h.state.config.max_body_bytes

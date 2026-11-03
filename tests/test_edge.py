@@ -94,6 +94,7 @@ class Upstream(BaseHTTPRequestHandler):
 
 
 class Edge(unittest.TestCase):
+    MASTER: bytes | None = None  # SignedEdge in test_assertion.py runs every test here with SPEC-002 on
     @classmethod
     def setUpClass(cls):
         cls.key = TestKey("k1")
@@ -119,6 +120,7 @@ class Edge(unittest.TestCase):
             subject_limit_per_minute=5,
             failure_limit_per_minute=3,
             upstream_timeout_seconds=2.0,
+            assertion_master=self.MASTER,
         )
         self.gateway = create_server(GatewayConfig(), telemetry_sink=self.events.append, edge=edge)
         threading.Thread(target=self.gateway.serve_forever, kwargs={"poll_interval": 0.02}, daemon=True).start()
@@ -278,6 +280,12 @@ class Edge(unittest.TestCase):
                 self.assertEqual(headers["X-Content-Type-Options"], "nosniff")
                 self.assertEqual(headers["Cache-Control"], "no-store")
                 self.assertTrue(headers["X-Request-ID"])
+
+    def test_spec002_assertion_only_with_a_master_key(self):
+        # AC5 here (MASTER None); SignedEdge runs the same test with signing on.
+        self.call("/v1/habits/items", token=self.good())
+        sent = self.upstream.records[-1]["headers"].get("x-gateway-assertion")
+        self.assertEqual(sent is not None, self.MASTER is not None)
 
     def test_telemetry_never_carries_token_or_path_tail(self):
         token = self.good()

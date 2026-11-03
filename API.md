@@ -106,6 +106,9 @@ Forwarded to the upstream: `Authorization`, `Accept`, `Content-Type`, `If-Match`
 `If-None-Match`, `Idempotency-Key`, `X-Empire-Channel`, `X-Correlation-Id`,
 `X-Workspace-Authorization` (platform-data caller JWT) and the gateway's
 `X-Request-ID`; never the edge header.
+With `GATEWAY_ASSERTION_MASTER_KEY` set the gateway also adds `X-Gateway-Assertion`
+(SPEC-002): a 60-second HMAC over the system, method, forwarded target, request id and
+`Authorization`, made with that system's own derived key. A caller's own value is never forwarded.
 The upstream's status and body come back unchanged (errors included); kept response headers:
 `Content-Type`, `ETag`, `Retry-After`, `WWW-Authenticate`, and `Location` only when it stays on
 the same upstream (rewritten to `/v1/<system>/…`). Connection errors are 502, timeouts 504
