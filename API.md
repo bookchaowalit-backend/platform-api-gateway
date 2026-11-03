@@ -9,6 +9,7 @@ machine-readable interface list is `interfaces` in [`contract.json`](contract.js
 | `api-gateway.http.healthz` | `GET` | `/healthz` | Public | No upstream call; reports process health |
 | `api-gateway.http.readyz` | `GET` | `/readyz` | Public | TCP connect to the upstream (no HTTP request); 503 when not ready |
 | `api-gateway.http.proxy` | `GET`, `POST` | `/api/*` | `Authorization: Bearer <configured token>` | Proxies to the configured, allow-listed upstream |
+| `api-gateway.http.edge` | `GET`, `HEAD`, `POST`, `PUT`, `PATCH`, `DELETE` | `/v1/<system>/*` | `X-Gateway-Edge` (added by Cloudflare) and `Authorization: Bearer <RS256 token>` from a trusted issuer | Proxies to the system's registry URL from `routes.json`; the token is forwarded for the service's own audience and scope checks |
 
 `/healthz` is liveness only and always returns 200 with
 `{"contract": "book-api-gateway.v1", "status": "ok", "auth_configured": <bool>}`.
@@ -76,3 +77,39 @@ Every error body is `{"error": "<message>", "request_id": "<id>"}`.
 `other`), request ID, status, latency and (for authenticated calls) a short
 subject hash. It never contains authorization headers, request bodies, query
 values or upstream response bodies.
+
+## Edge routes (`/v1/`, SPEC-001)
+
+Production ingress is `https://gateway.bookchaowalit.com`, proxied by Cloudflare. The
+`/v1/` route class exists only when `GATEWAY_TRUSTED_ISSUERS` is set; the full requirements
+and acceptance criteria are in [docs/specs/001-edge-gateway.md](docs/specs/001-edge-gateway.md).
+
+| Step | Rule | Answer when it fails |
+|---|---|---|
+| Edge lock | `X-Gateway-Edge` equals `GATEWAY_EDGE_SECRET` (constant-time) | 403 `direct access not allowed` |
+| Path | no dot segments, backslashes, encoded slashes or control characters; query ≤ 2048 characters | 400 |
+| Route | `<system>` is in `routes.json` (generated from the registry: online systems with an https URL, minus web frontends, `identity` and `ai-gateway`) | 404 |
+| Client lock | failed tokens per client IP (`CF-Connecting-IP`, trusted only behind the edge lock), default 10/min | 429 |
+| Token | RS256, `kid`, trusted `iss` (`GATEWAY_TRUSTED_ISSUERS`: issuer → JWKS URL), valid signature, `exp`/`nbf`/`iat` within 60 s skew, `sub` and `aud` present | 401 (`WWW-Authenticate: Bearer`); 503 when no key of the issuer can be loaded |
+| Subject limit | per `iss`+`sub`, default 120/min | 429 with `Retry-After` |
+| Body | ≤ 1 MiB, no chunked encoding | 411 / 413 / 400 |
+
+Forwarded to the upstream: `Authorization`, `Accept`, `Content-Type`, `If-Match`,
+`If-None-Match`, `Idempotency-Key` and the gateway's `X-Request-ID`; never the edge header.
+The upstream's status and body come back unchanged (errors included); kept response headers:
+`Content-Type`, `ETag`, `Retry-After`, `WWW-Authenticate`, and `Location` only when it stays on
+the same upstream (rewritten to `/v1/<system>/…`). Connection errors are 502, timeouts 504
+(`GATEWAY_UPSTREAM_TIMEOUT_SECONDS`, default 30). Every response, on every route, carries
+`X-Request-ID`, `Strict-Transport-Security: max-age=31536000`,
+`X-Content-Type-Options: nosniff` and `Cache-Control: no-store`.
+
+Telemetry adds `system` and the hashed `iss`+`sub` to `request.completed`; tokens, path tails,
+query strings and bodies are never logged.
+
+| Variable | Meaning |
+|---|---|
+| `GATEWAY_TRUSTED_ISSUERS` | JSON object issuer → https JWKS URL; enables `/v1/` |
+| `GATEWAY_EDGE_SECRET` | 32+ characters; the same value is set by the Cloudflare request-header Transform Rule |
+| `GATEWAY_ROUTES` | optional path to a route table (default `routes.json`) |
+| `GATEWAY_SUBJECT_LIMIT_PER_MINUTE`, `GATEWAY_FAILURE_LIMIT_PER_MINUTE`, `GATEWAY_UPSTREAM_TIMEOUT_SECONDS` | limits (120, 10, 30) |
+| `GATEWAY_HOST`, `GATEWAY_PORT` / `PORT` | bind address |

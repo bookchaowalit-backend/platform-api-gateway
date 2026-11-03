@@ -8,6 +8,15 @@ contract, documented surface, ingress hardening and CI. It still uses a single
 local pilot token, has one upstream, and has no shadow-parity evidence against
 `solo-empire/infra/api/server.ts`.
 
+## Pass 3 (2026-11-03, SPEC-001 edge gateway)
+
+- P0 "replace the pilot token with identity": done for the new `/v1/` route class (RS256
+  against platform-identity and empire-platform JWKS, standard library only). The pilot
+  `/api/*` class keeps its token for compatibility and is unset in production.
+- P1 "route table": done (`routes.json` generated from the registry, 43 systems).
+- Open: consumer cutovers one by one; services still accept direct calls (a gateway-signed
+  assertion they check is a later spec).
+
 ## Backlog
 
 ### P0

@@ -1,0 +1,11 @@
+# Railway (Singapore, serverless): gateway.bookchaowalit.com behind the Cloudflare proxy (SPEC-001).
+# Variables: GATEWAY_TRUSTED_ISSUERS, GATEWAY_EDGE_SECRET (Infisical /platform-api-gateway).
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+healthcheckPath = "/healthz"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3

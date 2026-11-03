@@ -68,6 +68,16 @@
       "auth": "Authorization: Bearer <configured token>"
     },
     {
+      "id": "api-gateway.http.edge",
+      "kind": "http",
+      "direction": "provides",
+      "name": "GET|HEAD|POST|PUT|PATCH|DELETE /v1/<system>/*",
+      "status": "implemented",
+      "source": "src/book_api_gateway/edge.py",
+      "contract": "platform-api-gateway.v1",
+      "auth": "X-Gateway-Edge (Cloudflare) + Authorization: Bearer <RS256 token from a trusted issuer>"
+    },
+    {
       "id": "api-gateway.http.upstream",
       "kind": "http",
       "direction": "consumes",
@@ -87,9 +97,9 @@
       "id": "api-gateway.consumes.identity",
       "kind": "http",
       "direction": "consumes",
-      "name": "Identity subject assertion (planned replacement for the pilot token)",
-      "status": "planned",
-      "source": "none"
+      "name": "Trusted issuers' JWKS (platform-identity, empire-platform) for RS256 token verification",
+      "status": "implemented",
+      "source": "src/book_api_gateway/jwt_verify.py"
     }
   ]
 }

@@ -10,6 +10,20 @@ parent registry. This checkout contains a dependency-free local HTTP pilot; it
 does not contain production provider integration, a database writer, or a
 customer payload.
 
+## Edge gateway (SPEC-001)
+
+`/v1/<system>/<path>` is the production ingress for the registry's services:
+`https://gateway.bookchaowalit.com`, proxied by Cloudflare, on Railway (Singapore). It
+rejects requests that did not come through Cloudflare (`X-Gateway-Edge`), verifies RS256
+tokens from the trusted issuers (platform-identity, empire-platform) against their JWKS,
+limits failed tokens per client IP and requests per subject, adds `X-Request-ID`, HSTS and
+`nosniff`, and passes the caller's token through so each service keeps its own audience and
+scope checks. Routes come from `routes.json`, generated from the hub registry with
+`scripts/generate_routes.py --registry <online-systems.yaml>` and committed; the gateway never
+reads the hub. Requirements and acceptance criteria:
+[docs/specs/001-edge-gateway.md](docs/specs/001-edge-gateway.md); surface: [API.md](API.md).
+Consumers move one at a time; the direct service URLs keep working until a cutover is recorded.
+
 ## Boundary
 
 - Owner: `bookchaowalit-backend`

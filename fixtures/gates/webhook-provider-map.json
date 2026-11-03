@@ -73,6 +73,18 @@
           "POST"
         ],
         "external_provider_ingress": false
+      },
+      "/v1/*": {
+        "access": "platform-token",
+        "methods": [
+          "DELETE",
+          "GET",
+          "HEAD",
+          "PATCH",
+          "POST",
+          "PUT"
+        ],
+        "external_provider_ingress": false
       }
     },
     "contract_interfaces": {
@@ -81,7 +93,8 @@
       "api-gateway.http.proxy": "carries provider-shaped paths only as an authenticated service passthrough",
       "api-gateway.http.upstream": "internal allow-listed upstream, not an external provider",
       "api-gateway.event.request-completed": "redacted telemetry, not an external provider",
-      "api-gateway.consumes.identity": "internal platform dependency (planned), not an external provider"
+      "api-gateway.consumes.identity": "internal platform dependency: JWKS of the trusted issuers, not an external provider",
+      "api-gateway.http.edge": "authenticated platform-token passthrough to registry services; no external provider ingress (webhooks stay on their own receivers)"
     },
     "signed_webhook_route_class": "missing",
     "signature_verification": "missing",
@@ -97,8 +110,18 @@
       "src/book_api_gateway/server.py:28",
       "src/book_api_gateway/server.py:38-42",
       "src/book_api_gateway/server.py:212-229",
-      "src/book_api_gateway/server.py:306-314"
-    ]
+      "src/book_api_gateway/server.py:306-314",
+      "src/book_api_gateway/edge.py:FORWARD_REQUEST"
+    ],
+    "edge_forwarded_request_headers": [
+      "Authorization",
+      "Accept",
+      "Content-Type",
+      "If-Match",
+      "If-None-Match",
+      "Idempotency-Key"
+    ],
+    "edge_forwards_signature_headers": false
   },
   "providers": [
     {

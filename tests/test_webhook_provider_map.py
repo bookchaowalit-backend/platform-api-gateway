@@ -463,7 +463,8 @@ class GatewaySourceCoverageTests(unittest.TestCase):
         covered = set(self.gateway["route_classes"])
         for literal in sorted(literals):
             with self.subTest(literal=literal):
-                normalized = "/api/*" if literal.rstrip("*").rstrip("/") == "/api" else literal
+                prefix = literal.rstrip("*").rstrip("/")
+                normalized = f"{prefix}/*" if prefix in {"/api", "/v1"} else literal
                 self.assertIn(normalized, covered)
 
     def test_contract_json_interfaces_are_mapped(self) -> None:
@@ -486,6 +487,14 @@ class GatewaySourceCoverageTests(unittest.TestCase):
         for header in SYNTHETIC_SIGNATURE_HEADERS:
             self.assertNotIn(header, source, f"{header} appears in server.py; update the map")
         self.assertEqual(self.gateway["signature_verification"], "missing")
+
+    def test_edge_forwarded_headers_match_source(self) -> None:
+        from book_api_gateway.edge import FORWARD_REQUEST
+
+        self.assertEqual(list(FORWARD_REQUEST), self.gateway["edge_forwarded_request_headers"])
+        forwarded = {name.lower() for name in FORWARD_REQUEST}
+        self.assertEqual(self.gateway["edge_forwards_signature_headers"],
+                         bool(forwarded & set(SYNTHETIC_SIGNATURE_HEADERS)))
 
     def test_forwarded_header_allow_list_matches_source(self) -> None:
         self.assertEqual(list(FORWARD_HEADERS), self.gateway["forwarded_request_headers"])

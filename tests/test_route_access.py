@@ -20,12 +20,19 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from test_gateway import RecordingUpstreamServer, start_server
 
 from book_api_gateway.config import GatewayConfig
-from book_api_gateway.server import PUBLIC, ROUTE_ACCESS, SERVICE, create_server
+from book_api_gateway.server import (
+    PLATFORM_TOKEN,
+    PUBLIC,
+    ROUTE_ACCESS,
+    SERVICE,
+    create_server,
+)
 
 EXPECTED = {
     "/healthz": (PUBLIC, {"GET"}),
     "/readyz": (PUBLIC, {"GET"}),
     "/api/*": (SERVICE, {"GET", "POST"}),
+    "/v1/*": (PLATFORM_TOKEN, {"GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"}),
 }
 SAMPLE_PATHS = {"/healthz": "/healthz", "/readyz": "/readyz", "/api/*": "/api/demo/items"}
 SAFE_METHODS = {"GET", "HEAD"}
@@ -78,6 +85,8 @@ class RouteAccessMatrixTests(unittest.TestCase):
     def test_every_route_method_and_caller(self) -> None:
         callers = {"anonymous": None, "wrong-token": "Bearer wrong", "service": f"Bearer {TOKEN}"}
         for route, (level, methods) in ROUTE_ACCESS.items():
+            if level == PLATFORM_TOKEN:
+                continue  # needs the edge and signed tokens: driven method by method in test_edge.py
             path = SAMPLE_PATHS[route]
             for method in ALL_METHODS:
                 for caller, authorization in callers.items():
@@ -95,7 +104,8 @@ class RouteAccessMatrixTests(unittest.TestCase):
         self.assertEqual(forwarded, {("GET", "/api/demo/items"), ("POST", "/api/demo/items")})
 
     def test_unclassified_paths_are_not_served(self) -> None:
-        for path in ("/", "/api", "/api/", "/admin", "/healthz/extra", "/metrics"):
+        # Without the edge configured, /v1/ is not served either.
+        for path in ("/", "/api", "/api/", "/admin", "/healthz/extra", "/metrics", "/v1/habits/x"):
             with self.subTest(path=path):
                 self.assertEqual(self._status("GET", path, f"Bearer {TOKEN}"), 404)
 

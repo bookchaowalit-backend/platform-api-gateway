@@ -20,6 +20,8 @@ from urllib.parse import unquote, urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from .config import GatewayConfig
+from .edge import METHODS as EDGE_METHODS
+from .edge import EdgeSettings, handle_v1
 from .limiter import FixedWindowRateLimiter
 
 REQUEST_ID_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}")
@@ -28,16 +30,20 @@ FORWARD_HEADERS = ("Accept", "Content-Type", "If-Match", "If-None-Match")
 ALLOWED_METHODS = frozenset({"GET", "POST"})
 
 # Route access matrix. "public" needs no credentials and may only serve safe
-# methods; "service" needs `Authorization: Bearer $GATEWAY_API_TOKEN`.
+# methods; "service" needs `Authorization: Bearer $GATEWAY_API_TOKEN`;
+# "platform-token" (SPEC-001 edge) needs the Cloudflare edge header and an RS256
+# token from a trusted issuer, and exists only when the edge is configured.
 # `_dispatch` reads the method sets from here and
 # tests/test_route_access.py pins every entry, so a new route class or
 # method has to be classified on purpose.
 PUBLIC = "public"
 SERVICE = "service"
+PLATFORM_TOKEN = "platform-token"
 ROUTE_ACCESS: dict[str, tuple[str, frozenset[str]]] = {
     "/healthz": (PUBLIC, frozenset({"GET"})),
     "/readyz": (PUBLIC, frozenset({"GET"})),
     "/api/*": (SERVICE, ALLOWED_METHODS),
+    "/v1/*": (PLATFORM_TOKEN, EDGE_METHODS),
 }
 TelemetrySink = Callable[[dict[str, Any]], None]
 
@@ -97,6 +103,8 @@ class GatewayState:
     upstream_probe: Callable[[], bool] | None = None
     # Counts failed bearer tokens per client IP so guessing is bounded.
     auth_failure_limiter: FixedWindowRateLimiter | None = None
+    # SPEC-001 /v1/<system>/… routes; None runs the pilot only.
+    edge: EdgeSettings | None = None
 
     def __post_init__(self) -> None:
         if self.auth_failure_limiter is None:
@@ -162,6 +170,8 @@ class GatewayRequestHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(payload)))
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Request-ID", request_id)
+        self.send_header("Strict-Transport-Security", "max-age=31536000")
+        self.send_header("X-Content-Type-Options", "nosniff")
         if self._body_pending():
             # The declared request body was not read, so the remaining bytes on
             # this connection cannot be trusted as the next request.
@@ -237,6 +247,8 @@ class GatewayRequestHandler(BaseHTTPRequestHandler):
         except ValueError:
             return self._error(400, "invalid request target", request_id)
         path = parsed.path or "/"
+        if path.startswith("/v1/") and self.state.edge is not None:
+            return handle_v1(self, self.state.edge, request_id, path, parsed.query)
         if parsed.query:
             return self._error(400, "query parameters are not supported by the pilot", request_id)
 
@@ -246,7 +258,7 @@ class GatewayRequestHandler(BaseHTTPRequestHandler):
                 return self._error(
                     405, "method not allowed", request_id, extra_headers={"Allow": ", ".join(sorted(methods))}
                 )
-            auth_configured = bool(self.state.config.api_token)
+            auth_configured = bool(self.state.config.api_token) or self.state.edge is not None
             if path == "/healthz":
                 # Liveness: the process answers; no dependency checks.
                 payload = {
@@ -256,7 +268,8 @@ class GatewayRequestHandler(BaseHTTPRequestHandler):
                 }
                 return self._send_json(200, payload, request_id)
             # Readiness: only route traffic here when /api/* can succeed.
-            upstream_reachable = self.state.upstream_probe()
+            # The edge has many upstreams and each answers for itself; readiness is the route table.
+            upstream_reachable = bool(self.state.edge.routes) if self.state.edge else self.state.upstream_probe()
             ready = auth_configured and upstream_reachable
             payload = {
                 "contract": "book-api-gateway.v1",
@@ -369,6 +382,7 @@ class GatewayRequestHandler(BaseHTTPRequestHandler):
         request_id = self._request_id()
         self._last_status = 500
         self._subject_hash: str | None = None
+        self._system: str | None = None
         self._body_consumed = False
         try:
             self._dispatch(request_id)
@@ -387,6 +401,8 @@ class GatewayRequestHandler(BaseHTTPRequestHandler):
             }
             if self._subject_hash is not None:
                 event["subject_hash"] = self._subject_hash
+            if self._system is not None:
+                event["system"] = self._system
             try:
                 self.state.telemetry_sink(event)
             except Exception:  # noqa: BLE001, S110 - telemetry must never break a request
@@ -403,6 +419,8 @@ class GatewayRequestHandler(BaseHTTPRequestHandler):
             return "readyz"
         if path.startswith("/api/"):
             return "api"
+        if path.startswith("/v1/"):
+            return "v1"
         return "other"
 
     def do_GET(self) -> None:
@@ -438,6 +456,7 @@ def create_server(
     host: str = "127.0.0.1",
     port: int = 0,
     telemetry_sink: TelemetrySink = _default_telemetry,
+    edge: EdgeSettings | None = None,
 ) -> GatewayHTTPServer:
     """Create a gateway server without starting its serving thread."""
 
@@ -445,6 +464,7 @@ def create_server(
         config=config,
         limiter=FixedWindowRateLimiter(config.rate_limit_per_minute),
         telemetry_sink=telemetry_sink,
+        edge=edge,
     )
     return GatewayHTTPServer((host, port), state)
 
@@ -456,16 +476,17 @@ def main() -> int:
 
     try:
         config = GatewayConfig.from_env()
+        edge = EdgeSettings.from_env()
     except ConfigError as exc:
         print(f"configuration error: {exc}", file=sys.stderr)
         return 2
     host = os.getenv("GATEWAY_HOST", "127.0.0.1")
     try:
-        port = int(os.getenv("GATEWAY_PORT", "8080"))
+        port = int(os.getenv("GATEWAY_PORT") or os.getenv("PORT") or "8080")
     except ValueError:
         print("configuration error: GATEWAY_PORT must be an integer", file=sys.stderr)
         return 2
-    server = create_server(config, host=host, port=port)
+    server = create_server(config, host=host, port=port, edge=edge)
     print(f"book-api-gateway listening on {host}:{server.server_port}", file=sys.stderr)
     try:
         server.serve_forever()
