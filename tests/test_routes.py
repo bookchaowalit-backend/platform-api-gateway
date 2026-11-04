@@ -29,12 +29,14 @@ class Generate(unittest.TestCase):  # AC7
             {"id": "ai-gateway", "status": "online", "kind": "service", "url": "https://ai.example"},
             {"id": "cron", "status": "online", "kind": "cron"},
         ]
-        self.assertEqual(generate_routes.routes_from(systems), {"habits": "https://habits-api.up.railway.app"})
+        self.assertEqual(generate_routes.routes_from(systems), {
+            "habits": "https://habits-api.up.railway.app", "ai-gateway": "https://ai.example"})
 
     def test_committed_table_is_valid(self):
         routes = load_routes()
         self.assertGreater(len(routes), 30)
-        for skipped in ("api-gateway", "identity", "ai-gateway"):
+        self.assertIn("ai-gateway", routes)  # identity tokens (ai-api) since 2026-11-04
+        for skipped in ("api-gateway", "identity"):
             self.assertNotIn(skipped, routes)
         self.assertTrue(all(r.base_url.startswith("https://") for r in routes.values()))
 

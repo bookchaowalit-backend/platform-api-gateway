@@ -19,8 +19,9 @@ from urllib.parse import urlsplit
 ROOT = Path(__file__).resolve().parents[1]
 SKIP_KINDS = {"web"}
 # Not behind the JWT check: the gateway itself; identity (its /v1/token takes no bearer token,
-# it issues them); ai-gateway (callers use its own static API keys, not platform JWTs).
-SKIP_IDS = {"api-gateway", "identity", "ai-gateway"}
+# it issues them). ai-gateway is routed since 2026-11-04: it accepts identity tokens (ai-api);
+# its static API keys still go to api.bookchaowalit.com directly.
+SKIP_IDS = {"api-gateway", "identity"}
 ID_RE = re.compile(r"[a-z][a-z0-9-]{1,62}")
 
 
