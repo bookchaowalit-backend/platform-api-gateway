@@ -136,7 +136,7 @@ class SignedEdge(Edge):
     def test_ac1_header_whitespace_is_normalised_before_signing(self):
         token = self.good()
         self.call("/v1/habits/items", token=token, method="POST", body=b"{}",
-                  headers={"Content-Type": "application/json "})
+                  headers={"Content-Type": "application/json \t"})
         rec = self.upstream.records[-1]
         self.assertEqual(rec["headers"]["content-type"], "application/json")
         result = assertion.verify(assertion.system_key(MASTER, "habits"), "habits",

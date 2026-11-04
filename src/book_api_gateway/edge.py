@@ -122,10 +122,14 @@ def unsafe_path(path: str) -> bool:
 
 
 def _clean(value: str | None, limit: int = 512) -> str | None:
-    if value is None or len(value) > limit or any(ord(c) < 0x20 or ord(c) == 0x7F for c in value):
+    if value is None:
         return None
-    # HTTP optional whitespace: h11 (the cells' uvicorn) strips it, so the signed value must too.
-    return value.strip(" ")
+    # HTTP optional whitespace (space, tab) first: h11 (the cells' uvicorn) strips it, so the signed
+    # value must match, and a legal trailing tab is not a control character to refuse.
+    value = value.strip(" \t")
+    if len(value) > limit or any(ord(c) < 0x20 or ord(c) == 0x7F for c in value):
+        return None
+    return value
 
 
 def _origin(url: str) -> tuple[str, str, int] | None:
