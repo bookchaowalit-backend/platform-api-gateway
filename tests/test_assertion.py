@@ -133,6 +133,17 @@ class SignedEdge(Edge):
                                   time.time(), sent, b"")
         self.assertEqual(result, "valid")
 
+    def test_ac1_header_whitespace_is_normalised_before_signing(self):
+        token = self.good()
+        self.call("/v1/habits/items", token=token, method="POST", body=b"{}",
+                  headers={"Content-Type": "application/json "})
+        rec = self.upstream.records[-1]
+        self.assertEqual(rec["headers"]["content-type"], "application/json")
+        result = assertion.verify(assertion.system_key(MASTER, "habits"), "habits",
+                                  rec["headers"].get("x-gateway-assertion"), "POST", "/items", f"Bearer {token}",
+                                  time.time(), "application/json", b"{}")
+        self.assertEqual(result, "valid")
+
     def test_ac3_caller_assertion_is_replaced(self):
         self.call("/v1/habits/items", token=self.good(), headers={"X-Gateway-Assertion": "v1.1.YQ.forged"})
         self.assertNotEqual(self.upstream.records[-1]["headers"].get("x-gateway-assertion"), "v1.1.YQ.forged")

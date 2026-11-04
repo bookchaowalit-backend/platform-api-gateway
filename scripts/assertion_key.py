@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Print one service's SPEC-002 key (64 hex) from GATEWAY_ASSERTION_MASTER_KEY in the environment.
 
     infisical run --path /platform-api-gateway -- python3 scripts/assertion_key.py habits \\
@@ -15,8 +14,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from book_api_gateway.assertion import parse_master, system_key  # noqa: E402
-from book_api_gateway.routes import load_routes  # noqa: E402
+from book_api_gateway.assertion import parse_master, system_key
+from book_api_gateway.routes import load_routes
 
 
 def main(argv: list[str]) -> int:
