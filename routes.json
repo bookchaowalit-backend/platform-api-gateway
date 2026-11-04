@@ -2,6 +2,7 @@
  "version": 1,
  "routes": {
   "accounts": "https://accounts-api-production-cfee.up.railway.app",
+  "ai-gateway": "https://api.bookchaowalit.com",
   "automation": "https://automation-api-production-af8e.up.railway.app",
   "book-job-data": "https://book-job-data-api-production.up.railway.app",
   "budgets": "https://budgets-api-production-690e.up.railway.app",
