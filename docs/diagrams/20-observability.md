@@ -8,8 +8,9 @@ flowchart LR
   ERR --> RL
   UPT["platform-uptime-worker, target api-gateway, hourly, group own"] -->|"GET /healthz"| GW["Gateway"]
   UPT -->|"down"| TG["Telegram via book_noti_bot"]
-  RH["Railway healthcheck /healthz"] --> GW
-  RH -->|"fail"| RS["Restart ON_FAILURE, max 3"]
+  RH["Railway healthcheck /healthz, deploy activation only"] -->|"fail"| NA["New deployment not activated, old stays live"]
+  PX["Process exits or crashes"] --> RS["Restart ON_FAILURE, max 3"]
+  HANG["Process hangs but stays up"] -.->|"no automatic restart"| UPT
   SVC["Services in report mode"] --> GA["gateway_assertion result log, in service"]
 ```
 

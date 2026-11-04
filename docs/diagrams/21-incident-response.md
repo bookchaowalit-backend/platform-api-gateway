@@ -6,7 +6,7 @@
 flowchart TD
   A1["Uptime worker: api-gateway /healthz down, Telegram"] --> T["Triage"]
   A2["Consumer reports errors, e.g. MCP hub sweep, CLI"] --> T
-  A3["Railway healthcheck fails, restart up to 3"] --> T
+  A3["Deploy healthcheck fails (new deploy not activated) or process crash restarts up to 3; a hung process is only caught by uptime-worker"] --> T
   T --> Q1{"Gateway or upstream?"}
   Q1 -->|"request.completed status 502 or 504 for one system"| U["Upstream: check that service directly"]
   Q1 -->|"401 or 503 token verification unavailable"| J["Issuer JWKS or GATEWAY_TRUSTED_ISSUERS"]
