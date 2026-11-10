@@ -30,7 +30,7 @@ flowchart LR
 | RTO / RPO | **not defined** (ไม่มีใน PRODUCT.md, SPEC หรือ UPGRADE-PLAN); RPO ไม่เกี่ยวเพราะไม่มีข้อมูล |
 | DR drill | UPGRADE-PLAN P2 "Rollback-route drill documentation" ยังเปิด |
 
-Sources: `contract.json`, `railway.toml`, `Dockerfile`, `API.md`, `docs/UPGRADE-PLAN.md`, `.github/workflows/check.yml`, Railway `list-deployments` project `platform-api-gateway` (2026-11-03), ops record: api-gateway-edge (2026-11-03)
+Sources: `contract.json`, `.railway/railway.ts`, `Dockerfile`, `API.md`, `docs/UPGRADE-PLAN.md`, `.github/workflows/check.yml`, Railway `list-deployments` project `platform-api-gateway` (2026-11-03), ops record: api-gateway-edge (2026-11-03)
 
 ## Open questions
 

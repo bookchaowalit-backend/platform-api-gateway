@@ -45,7 +45,7 @@ flowchart LR
 | regenerate routes | local operator | — | `scripts/generate_routes.py` |
 | derive assertion key | local operator, master key in env | — | `scripts/assertion_key.py` |
 
-Sources: `src/book_api_gateway/server.py`, `src/book_api_gateway/edge.py`, `scripts/generate_routes.py`, `scripts/assertion_key.py`, `API.md`, `contract.json` (`migration.cutover`), `railway.toml`
+Sources: `src/book_api_gateway/server.py`, `src/book_api_gateway/edge.py`, `scripts/generate_routes.py`, `scripts/assertion_key.py`, `API.md`, `contract.json` (`migration.cutover`), `.railway/railway.ts`
 
 ## Open questions
 

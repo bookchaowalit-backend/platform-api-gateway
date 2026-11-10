@@ -23,7 +23,7 @@ flowchart LR
 | PostHog / metrics / traces | none | — |
 | SPEC-002 report log | `gateway_assertion result=valid, missing or invalid` | อยู่ใน service (habits) ไม่ใช่ repo นี้ |
 
-Sources: `src/book_api_gateway/server.py` (`_default_telemetry`, `_handle_request`, `_route_class`, `main`), `railway.toml`, `PRODUCT.md` (Sentry waiver), platform-uptime-worker `src/targets.ts` (line 84-85), `docs/specs/002-gateway-assertion.md` R5, ops record: prod-baseline-monitoring-backups (2026-11-03) (Telegram via book_noti_bot), ops record: api-gateway-edge (2026-11-03)
+Sources: `src/book_api_gateway/server.py` (`_default_telemetry`, `_handle_request`, `_route_class`, `main`), `.railway/railway.ts`, `PRODUCT.md` (Sentry waiver), platform-uptime-worker `src/targets.ts` (line 84-85), `docs/specs/002-gateway-assertion.md` R5, ops record: prod-baseline-monitoring-backups (2026-11-03) (Telegram via book_noti_bot), ops record: api-gateway-edge (2026-11-03)
 
 ## Open questions
 

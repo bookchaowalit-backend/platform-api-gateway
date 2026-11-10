@@ -10,7 +10,7 @@ Network review (NET-04) พบว่า API ถูกเรียกตรงบ
 host บน Railway project `platform-api-gateway` service `gateway` (Singapore, serverless) ใต้ custom domain `gateway.bookchaowalit.com` ที่ proxied โดย Cloudflare; Cloudflare Transform Rule ใส่ `X-Gateway-Edge` และ gateway ตอบ 403 ถ้า header ไม่ตรง `GATEWAY_EDGE_SECRET`; `CF-Connecting-IP` เชื่อถือได้หลังผ่าน lock เท่านั้น
 
 ## Evidence
-- `railway.toml` (DOCKERFILE builder, healthcheck `/healthz`)
+- `.railway/railway.ts` (DOCKERFILE builder, healthcheck `/healthz`)
 - `src/book_api_gateway/edge.py` `handle_v1` (`EDGE_HEADER`, `hmac.compare_digest`)
 - `API.md` (Edge routes: zone rules, BIC off, 60 req / 10 s rule)
 - `docs/specs/001-edge-gateway.md` R2; architecture-docs `systems/architecture/network-architecture.md` NET-04

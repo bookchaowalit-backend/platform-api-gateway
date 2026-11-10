@@ -38,7 +38,7 @@ flowchart LR
 
 หมายเหตุ: gitGraph ด้านบนย่อเฉพาะจุดสำคัญ (ไม่ใช่ทุก commit); ลำดับ PR #2 (`boo-147-owner-decision`, merged 2026-10-16) ไม่ได้แสดง
 
-Sources: `git log origin/main`, `git branch -r`, `gh pr list -R bookchaowalit-backend/platform-api-gateway --state all`, `.github/workflows/check.yml`, `railway.toml`, `README.md` (Boundary: "CLI deploy of git archive main"), ops record: api-gateway-edge (2026-11-03)
+Sources: `git log origin/main`, `git branch -r`, `gh pr list -R bookchaowalit-backend/platform-api-gateway --state all`, `.github/workflows/check.yml`, `.railway/railway.ts`, `README.md` (Boundary: "CLI deploy of git archive main"), ops record: api-gateway-edge (2026-11-03)
 
 ## Open questions
 

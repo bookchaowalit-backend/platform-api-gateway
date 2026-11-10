@@ -23,7 +23,7 @@ flowchart LR
 | Failed deployment recovery time | production: no failed deployment → **not measurable**; CI proxy: red run on `main` → next green | CI: **2 h 01 min** (`b171738` 03:35 → `4506614` 05:36 UTC, 2026-10-13), **3 min** (`2bcd40d` 09:41 → `7943803` 09:44, 2026-10-22); **open** since `e653535` 16:17 UTC 2026-11-03 (Ruff on `scripts/assertion_key.py`) | same `gh run list`, ordered by `createdAt` |
 | Deployment rework rate | deployments whose newest included commit subject starts with `fix` | **10 / 14 = 71 %** (`9ca3015`, `cd5d239`, `1d204d8`, `c998368`, `4117fec`, `f7b1edf`, `754413c`, `635f6ef`, `c7b16d1`, `8481507`); commit-level: 16 / 48 = 33 % `^fix` | `git log origin/main --since="90 days ago" --format='%s' \| grep -ciE '^(fix\|revert)'` |
 
-Sources: `git log origin/main`, `gh run list -R bookchaowalit-backend/platform-api-gateway` (47 runs, 36 on `main`), Railway `list-deployments` project `platform-api-gateway` (2026-11-03), `.github/workflows/check.yml`, `railway.toml`
+Sources: `git log origin/main`, `gh run list -R bookchaowalit-backend/platform-api-gateway` (47 runs, 36 on `main`), Railway `list-deployments` project `platform-api-gateway` (2026-11-03), `.github/workflows/check.yml`, `.railway/railway.ts`
 
 ## Caveats
 
