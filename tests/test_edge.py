@@ -7,7 +7,7 @@ import threading
 import time
 import unittest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from jwt_fixtures import TestKey, claims
@@ -20,6 +20,8 @@ from book_api_gateway.server import create_server
 
 ISS = "https://issuer.test"
 SECRET = "edge-secret-for-tests"
+MIB = 1024 * 1024
+DOCS_LIMIT = 3 * MIB  # a route with its own body limit above the 1 MiB default
 
 
 class Upstream(BaseHTTPRequestHandler):
@@ -57,6 +59,13 @@ class Upstream(BaseHTTPRequestHandler):
             return
         length = int(self.headers.get("Content-Length", "0"))
         body = self.rfile.read(length) if length else b""
+        if self.path.startswith("/big?n="):
+            payload = b"x" * int(self.path.split("=", 1)[1])
+            self.send_response(200)
+            self.send_header("Content-Length", str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
+            return
         self.server.records.append({"method": self.command, "path": self.path, "body": body,
                                     "headers": {k.lower(): v for k, v in self.headers.items()}})
         status = 404 if self.path.startswith("/missing") else 201 if self.command == "POST" else 200
@@ -114,7 +123,8 @@ class Edge(unittest.TestCase):
         base = f"http://127.0.0.1:{self.upstream.server_port}"
         keys = IssuerKeys(ISS + "/jwks", fetch=lambda _u: {"keys": [self.key.jwk()]})
         edge = EdgeSettings(
-            routes={"habits": Route("habits", base, "127.0.0.1")},
+            routes={"habits": Route("habits", base, "127.0.0.1"),
+                    "docs": Route("docs", base, "127.0.0.1", max_body_bytes=DOCS_LIMIT)},
             verifier=TokenVerifier({ISS: keys}),
             edge_secret=SECRET,
             subject_limit_per_minute=5,
@@ -199,6 +209,32 @@ class Edge(unittest.TestCase):
         status, _, _ = self.call("/v1/habits/items", token=token)
         self.assertEqual(status, 200)
         self.assertEqual(self.upstream.records[-1]["headers"]["authorization"], f"Bearer {token}")
+
+    def test_route_body_limit_raises_the_default_for_that_route_only(self):
+        big = b"y" * (2 * MIB)
+        self.assertRefusedUnforwarded("/v1/habits/items", big)
+        status, _, _ = self.call("/v1/docs/items", token=self.good(), method="POST", body=big)
+        self.assertEqual(status, 201)
+        self.assertEqual(self.upstream.records[-1]["body"], big)
+        self.assertRefusedUnforwarded("/v1/docs/items", b"z" * (DOCS_LIMIT + 1))
+
+    def assertRefusedUnforwarded(self, path, body):
+        """413, or the connection cut while the client still sends: the gateway answers before reading."""
+        before = len(self.upstream.records)
+        try:
+            status, _, _ = self.call(path, token=self.good(), method="POST", body=body)
+        except (URLError, ConnectionError):
+            status = 413
+        self.assertEqual(status, 413)
+        self.assertEqual(len(self.upstream.records), before)
+
+    def test_route_body_limit_also_caps_the_response(self):
+        status, _, _ = self.call(f"/v1/habits/big?n={2 * MIB}", token=self.good())
+        self.assertEqual(status, 502)
+        status, _, body = self.call(f"/v1/docs/big?n={2 * MIB}", token=self.good())
+        self.assertEqual((status, len(body)), (200, 2 * MIB))
+        status, _, _ = self.call(f"/v1/docs/big?n={DOCS_LIMIT + 1}", token=self.good())
+        self.assertEqual(status, 502)
 
     def test_not_modified_passes_through(self):
         status, headers, body = self.call("/v1/habits/not-modified", token=self.good(),

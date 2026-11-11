@@ -55,7 +55,15 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--out", type=Path, default=ROOT / "routes.json")
     args = p.parse_args(argv)
     routes = routes_from(load_registry(args.registry))
-    args.out.write_text(json.dumps({"version": 1, "routes": routes}, indent=1) + "\n", encoding="utf-8")
+    table: dict = {"version": 1, "routes": routes}
+    # Per-route body limits are set by hand, not by the registry: keep the ones whose route stays.
+    try:
+        kept = json.loads(args.out.read_text(encoding="utf-8")).get("limits", {})
+    except (OSError, ValueError, AttributeError):
+        kept = {}
+    if limits := {system: limit for system, limit in kept.items() if system in routes}:
+        table["limits"] = limits
+    args.out.write_text(json.dumps(table, indent=1) + "\n", encoding="utf-8")
     print(f"wrote {len(routes)} routes to {args.out.name}")
     return 0
 

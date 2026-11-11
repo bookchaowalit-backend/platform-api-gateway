@@ -21,12 +21,36 @@ class Route:
     system: str
     base_url: str
     host: str
+    # Request and response body cap for this route; None = the gateway-wide MAX_BODY_BYTES.
+    max_body_bytes: int | None = None
+
+
+MAX_ROUTE_BODY_BYTES = 16 * 1024 * 1024  # a per-route limit may raise the default up to this
+
+
+def _limits(table: dict) -> dict[str, int]:
+    """Optional `"limits": {"<system>": {"max_body_bytes": N}}` beside `"routes"`."""
+    raw = table.get("limits", {})
+    if not isinstance(raw, dict):
+        raise RouteError("limits must be an object")
+    limits = {}
+    for system, entry in raw.items():
+        value = entry.get("max_body_bytes") if isinstance(entry, dict) else None
+        if (not isinstance(value, int) or isinstance(value, bool) or not 0 < value <= MAX_ROUTE_BODY_BYTES
+                or set(entry) != {"max_body_bytes"}):
+            raise RouteError(f"invalid limit for {system!r}")
+        limits[system] = value
+    return limits
 
 
 def load_routes(path: Path = DEFAULT_ROUTES) -> dict[str, Route]:
     try:
-        raw = json.loads(path.read_text(encoding="utf-8"))["routes"]
-    except (OSError, ValueError, KeyError, TypeError) as exc:
+        table = json.loads(path.read_text(encoding="utf-8"))
+        raw = table["routes"]
+        limits = _limits(table)
+    except RouteError:
+        raise
+    except (OSError, ValueError, KeyError, TypeError, AttributeError) as exc:
         raise RouteError(f"cannot read route table {path.name}") from exc
     routes = {}
     for system, base in raw.items():
@@ -38,9 +62,11 @@ def load_routes(path: Path = DEFAULT_ROUTES) -> dict[str, Route]:
         if (not ID_RE.fullmatch(system) or parts.scheme != "https" or not parts.hostname
                 or parts.path not in ("", "/") or parts.query or parts.fragment or parts.username):
             raise RouteError(f"invalid route {system!r}")
-        routes[system] = Route(system, f"https://{parts.netloc}", parts.hostname)
+        routes[system] = Route(system, f"https://{parts.netloc}", parts.hostname, limits.get(system))
     if not routes:
         raise RouteError("route table is empty")
+    if unknown := sorted(set(limits) - set(routes)):
+        raise RouteError(f"limit for unknown route {unknown[0]!r}")
     return routes
 
 

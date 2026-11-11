@@ -61,7 +61,7 @@ Ingress hardening:
 | 404 | `route not found` | Outside `/healthz`, `/readyz`, `/api/*` |
 | 405 | `method not allowed` | Method outside the route's `Allow` list |
 | 411 | `chunked request bodies are not supported` | `Transfer-Encoding` present |
-| 413 | `request body too large` | Body above `MAX_BODY_BYTES` |
+| 413 | `request body too large` | Body above `MAX_BODY_BYTES`, or the route's own limit (see below) |
 | 429 | `rate limit exceeded` | Per-subject fixed window exhausted (`Retry-After`) |
 | 429 | `too many failed authentication attempts` | Client IP exceeded `AUTH_FAILURE_LIMIT_PER_MINUTE` wrong tokens (`Retry-After`) |
 | 502 | `upstream unavailable`, `upstream response too large` | Upstream error, redirect or oversize body; upstream bodies are not relayed |
@@ -123,6 +123,6 @@ query strings and bodies are never logged.
 |---|---|
 | `GATEWAY_TRUSTED_ISSUERS` | JSON object issuer → https JWKS URL; enables `/v1/` |
 | `GATEWAY_EDGE_SECRET` | 32+ characters; the same value is set by the Cloudflare request-header Transform Rule |
-| `GATEWAY_ROUTES` | optional path to a route table (default `routes.json`) |
+| `GATEWAY_ROUTES` | optional path to a route table (default `routes.json`); its optional `"limits": {"<system>": {"max_body_bytes": N}}` sets that route's request and response body cap (up to 16 MiB; knowledge uses 16 MiB for store documents) |
 | `GATEWAY_SUBJECT_LIMIT_PER_MINUTE`, `GATEWAY_FAILURE_LIMIT_PER_MINUTE`, `GATEWAY_UPSTREAM_TIMEOUT_SECONDS` | limits (120, 10, 30) |
 | `GATEWAY_HOST`, `GATEWAY_PORT` / `PORT` | bind address |

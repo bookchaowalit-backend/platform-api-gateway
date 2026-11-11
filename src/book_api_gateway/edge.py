@@ -208,13 +208,17 @@ def handle_v1(h: GatewayRequestHandler, edge: EdgeSettings, request_id: str, pat
     if not allowed:
         return h._error(429, "rate limit exceeded", request_id, extra_headers={"Retry-After": str(retry_after)})
 
-    body = _read_body(h, request_id)
+    body = _read_body(h, route, request_id)
     if body is None:
         return h._last_status
     return _proxy(h, edge, route, rest + (f"?{query}" if query else ""), body, request_id)
 
 
-def _read_body(h: GatewayRequestHandler, request_id: str) -> bytes | None:
+def _body_limit(h: GatewayRequestHandler, route: Route) -> int:
+    return route.max_body_bytes or h.state.config.max_body_bytes
+
+
+def _read_body(h: GatewayRequestHandler, route: Route, request_id: str) -> bytes | None:
     if h.headers.get("Transfer-Encoding") is not None:
         h._error(411, "chunked request bodies are not supported", request_id)
         return None
@@ -224,7 +228,7 @@ def _read_body(h: GatewayRequestHandler, request_id: str) -> bytes | None:
         h._error(400, "invalid content length", request_id)
         return None
     length = int(raw)
-    if length > h.state.config.max_body_bytes:
+    if length > _body_limit(h, route):
         h._error(413, "request body too large", request_id)
         return None
     body = h.rfile.read(length) if length else b""
@@ -252,7 +256,7 @@ def _proxy(h: GatewayRequestHandler, edge: EdgeSettings, route: Route, target: s
                                                    request_id, headers.get("Authorization", ""),
                                                    headers.get("Content-Type", ""), body)
     request = Request(route.base_url + target, data=data, headers=headers, method=h.command)
-    limit = h.state.config.max_body_bytes
+    limit = _body_limit(h, route)
     try:
         response: Any = h.state.opener.open(request, timeout=edge.upstream_timeout_seconds)
     except HTTPError as exc:

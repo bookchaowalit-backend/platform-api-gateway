@@ -55,6 +55,27 @@ class Load(unittest.TestCase):
                 load_routes(self.write(bad))
 
 
+class Limits(unittest.TestCase):
+    def write(self, table):
+        path = Path(tempfile.mkdtemp()) / "routes.json"
+        path.write_text(json.dumps(table))
+        return path
+
+    def test_limit_applies_to_its_route_only(self):
+        routes = load_routes(self.write({"routes": {"docs": "https://d.example", "habits": "https://h.example"},
+                                         "limits": {"docs": {"max_body_bytes": 16 * 1024 * 1024}}}))
+        self.assertEqual(routes["docs"].max_body_bytes, 16 * 1024 * 1024)
+        self.assertIsNone(routes["habits"].max_body_bytes)
+
+    def test_rejects_bad_limits(self):
+        routes = {"docs": "https://d.example"}
+        for limits in ([], {"docs": 5}, {"docs": {"max_body_bytes": 0}}, {"docs": {"max_body_bytes": True}},
+                       {"docs": {"max_body_bytes": 16 * 1024 * 1024 + 1}}, {"docs": {"max_body_bytes": 5, "x": 1}},
+                       {"nope": {"max_body_bytes": 5}}):
+            with self.subTest(limits), self.assertRaises(RouteError):
+                load_routes(self.write({"routes": routes, "limits": limits}))
+
+
 class Match(unittest.TestCase):  # AC4 (unknown system)
     def setUp(self):
         self.routes = load_routes(self.write({"habits": "https://h.example"}))
