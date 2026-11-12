@@ -23,52 +23,49 @@ fi
 : "${GATEWAY_RAILWAY_ENVIRONMENT:=c96ce799-05d0-417e-a1d9-573d9dde0b67}"
 : "${GATEWAY_RAILWAY_SERVICE:=a2c21011-3e2d-4af6-9366-2c4b2ae6306b}"
 export GATEWAY_RAILWAY_PROJECT GATEWAY_RAILWAY_ENVIRONMENT GATEWAY_RAILWAY_SERVICE
-before="$(python3 - <<'PY'
-import json, os, urllib.request
-q = ("query($p:String!,$e:String!,$s:String!){ deployments(first:1, input:{projectId:$p, environmentId:$e,"
-     " serviceId:$s}){ edges { node { id } } } }")
-v = {"p": os.environ["GATEWAY_RAILWAY_PROJECT"], "e": os.environ["GATEWAY_RAILWAY_ENVIRONMENT"], "s": os.environ["GATEWAY_RAILWAY_SERVICE"]}
-req = urllib.request.Request("https://backboard.railway.com/graphql/v2", json.dumps({"query": q, "variables": v}).encode(),
-                             headers={"Authorization": "Bearer " + os.environ["RAILWAY_API_TOKEN"], "Content-Type": "application/json"})
-edges = json.load(urllib.request.urlopen(req, timeout=30))["data"]["deployments"]["edges"]
-print(edges[0]["node"]["id"] if edges else "")
-PY
-)"
 upload_log="$base/railway-up.json"
 nonce="deploy-$(date -u +%Y%m%dT%H%M%S)-$$"
 (cd "$work" && railway up --ci --json -p "$GATEWAY_RAILWAY_PROJECT" -e "$GATEWAY_RAILWAY_ENVIRONMENT" \
   -s "$GATEWAY_RAILWAY_SERVICE" -m "$sha $(git log -1 --format=%s "$ref" | cut -c1-50) [$nonce]" > "$upload_log")
 # Follow the deployment this upload created: its id from the CLI's JSON lines when present, else the
 # first deployment newer than the one live before the upload. Transient API errors are retried.
-python3 - "$upload_log" "$before" "$nonce" <<'PY' || { echo "the new deployment did not become SUCCESS; roll back with REF=<previous sha>" >&2; exit 1; }
+python3 - "$upload_log" "$nonce" <<'PY' || { echo "the new deployment did not become SUCCESS; roll back with REF=<previous sha>" >&2; exit 1; }
 import json, os, re, sys, time, urllib.error, urllib.request
-log, before, nonce = sys.argv[1], sys.argv[2], sys.argv[3]
+log, nonce = sys.argv[1], sys.argv[2]
 wanted = None
 for line in open(log, encoding="utf-8", errors="replace"):
     m = re.search(r'"deployment[_]?[Ii]d"\s*:\s*"([0-9a-f-]{36})"', line)
     if m:
         wanted = m.group(1)
-q = ("query($p:String!,$e:String!,$s:String!){ deployments(first:5, input:{projectId:$p, environmentId:$e,"
-     " serviceId:$s}){ edges { node { id status meta } } } }")
-v = {"p": os.environ["GATEWAY_RAILWAY_PROJECT"], "e": os.environ["GATEWAY_RAILWAY_ENVIRONMENT"], "s": os.environ["GATEWAY_RAILWAY_SERVICE"]}
+LIST = ("query($p:String!,$e:String!,$s:String!){ deployments(first:10, input:{projectId:$p, environmentId:$e,"
+        " serviceId:$s}){ edges { node { id meta } } } }")
+ONE = "query($id:String!){ deployment(id:$id){ id status } }"
+scope = {"p": os.environ["GATEWAY_RAILWAY_PROJECT"], "e": os.environ["GATEWAY_RAILWAY_ENVIRONMENT"],
+         "s": os.environ["GATEWAY_RAILWAY_SERVICE"]}
+
+
+def gql(query, variables):
+    req = urllib.request.Request("https://backboard.railway.com/graphql/v2", json.dumps({"query": query, "variables": variables}).encode(),
+                                 headers={"Authorization": "Bearer " + os.environ["RAILWAY_API_TOKEN"], "Content-Type": "application/json",
+                                          "User-Agent": "platform-api-gateway-deploy"})
+    return json.load(urllib.request.urlopen(req, timeout=30))["data"]
+
+
 for _ in range(90):
     try:
-        req = urllib.request.Request("https://backboard.railway.com/graphql/v2", json.dumps({"query": q, "variables": v}).encode(),
-                                     headers={"Authorization": "Bearer " + os.environ["RAILWAY_API_TOKEN"], "Content-Type": "application/json"})
-        nodes = [e["node"] for e in json.load(urllib.request.urlopen(req, timeout=30))["data"]["deployments"]["edges"]]
+        if not wanted:
+            # This upload's deployment carries the nonce in its CLI message (meta.cliMessage); no other
+            # deployment (another push, a variable change) can match it.
+            nodes = [e["node"] for e in gql(LIST, scope)["deployments"]["edges"]]
+            mine = [n for n in nodes if nonce in str((n.get("meta") or {}).get("cliMessage", ""))]
+            wanted = mine[0]["id"] if mine else None
+        status = gql(ONE, {"id": wanted})["deployment"]["status"] if wanted else None
     except (urllib.error.URLError, TimeoutError, KeyError, TypeError, ValueError):
         time.sleep(10)
         continue
-    if not wanted:
-        # This upload's deployment carries the nonce in its CLI message (meta.cliMessage); no other
-        # deployment (another push, a variable change) can match it.
-        mine_by_nonce = [n for n in nodes if nonce in str((n.get("meta") or {}).get("cliMessage", ""))]
-        if mine_by_nonce:
-            wanted = mine_by_nonce[0]["id"]
-    mine = next((n for n in nodes if n["id"] == wanted), None) if wanted else None
-    if mine and mine["status"] == "SUCCESS":
+    if status == "SUCCESS":
         sys.exit(0)
-    if mine and mine["status"] in ("FAILED", "CRASHED", "REMOVED", "SKIPPED"):
+    if status in ("FAILED", "CRASHED", "REMOVED", "SKIPPED"):
         sys.exit(1)
     time.sleep(10)
 sys.exit(1)
