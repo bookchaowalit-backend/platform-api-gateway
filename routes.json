@@ -46,6 +46,7 @@
   "subscriptions": "https://subscriptions-api-production-b1d4.up.railway.app",
   "tax": "https://tax-api-production-57f6.up.railway.app",
   "time": "https://time-api-production-2050.up.railway.app",
+  "tracking": "https://tracking-api-production-66f099ee.up.railway.app",
   "transactions": "https://transactions-api-production-4078.up.railway.app"
  },
  "limits": {

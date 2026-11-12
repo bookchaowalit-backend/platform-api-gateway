@@ -225,6 +225,11 @@
    "since": "2026-11-11",
    "enforce_review": "2026-11-18"
   },
+  "tracking": {
+   "mode": "report",
+   "since": "2026-11-12",
+   "enforce_review": "2026-11-19"
+  },
   "transactions": {
    "mode": "report",
    "since": "2026-11-11",
