@@ -25,8 +25,9 @@ fi
 export GATEWAY_RAILWAY_PROJECT GATEWAY_RAILWAY_ENVIRONMENT GATEWAY_RAILWAY_SERVICE
 upload_log="$base/railway-up.json"
 nonce="deploy-$(date -u +%Y%m%dT%H%M%S)-$$"
+subject="$(git log -1 --format=%s "$ref" | cut -c1-50)"  # read here: the archive below is not a git checkout
 (cd "$work" && railway up --ci --json -p "$GATEWAY_RAILWAY_PROJECT" -e "$GATEWAY_RAILWAY_ENVIRONMENT" \
-  -s "$GATEWAY_RAILWAY_SERVICE" -m "$sha $(git log -1 --format=%s "$ref" | cut -c1-50) [$nonce]" > "$upload_log")
+  -s "$GATEWAY_RAILWAY_SERVICE" -m "$sha $subject [$nonce]" > "$upload_log")
 # Follow the deployment this upload created: its id from the CLI's JSON lines when present, else the
 # first deployment newer than the one live before the upload. Transient API errors are retried.
 python3 - "$upload_log" "$nonce" <<'PY' || { echo "the new deployment did not become SUCCESS; roll back with REF=<previous sha>" >&2; exit 1; }
