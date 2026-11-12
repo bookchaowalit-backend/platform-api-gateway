@@ -8,9 +8,8 @@
    "enforce_review": "2026-11-19"
   },
   "ai-gateway": {
-   "mode": "planned",
-   "report_by": "2026-11-20",
-   "enforce_review": "2026-11-27"
+   "mode": "exempt",
+   "reason": "its own edge at api.bookchaowalit.com (Cloudflare WAF and limits, hashed static keys plus identity tokens); its callers do not use this gateway, so an assertion there would refuse them all"
   },
   "automation": {
    "mode": "report",
@@ -18,9 +17,8 @@
    "enforce_review": "2026-11-19"
   },
   "book-job-data": {
-   "mode": "planned",
-   "report_by": "2026-11-20",
-   "enforce_review": "2026-11-27"
+   "mode": "exempt",
+   "reason": "static read token (BOOK_JOB_DATA_API_TOKEN) only, which cannot pass this gateway; revisit when it accepts identity tokens"
   },
   "budgets": {
    "mode": "report",
@@ -45,17 +43,19 @@
   "crm": {
    "mode": "planned",
    "report_by": "2026-11-16",
-   "enforce_review": "2026-11-23"
+   "enforce_review": "2026-11-30",
+   "note": "code (sales-crm 1f44bdb; income branch deploy/income-jwt) and vars staged; deploy needs owner approval (agency main carries other unreleased commits). Enforce also needs crm-web (partner static token), public intake and the Stripe webhook handled"
   },
   "crm-income": {
    "mode": "planned",
    "report_by": "2026-11-16",
-   "enforce_review": "2026-11-23"
+   "enforce_review": "2026-11-30",
+   "note": "code (sales-crm 1f44bdb; income branch deploy/income-jwt) and vars staged; deploy needs owner approval (agency main carries other unreleased commits). Enforce also needs crm-web (partner static token), public intake and the Stripe webhook handled"
   },
   "decisions": {
-   "mode": "planned",
-   "report_by": "2026-11-16",
-   "enforce_review": "2026-11-23"
+   "mode": "report",
+   "since": "2026-11-12",
+   "enforce_review": "2026-11-19"
   },
   "diary": {
    "mode": "enforce",
@@ -95,9 +95,9 @@
    "enforce_review": "2026-11-19"
   },
   "integrations": {
-   "mode": "planned",
-   "report_by": "2026-11-16",
-   "enforce_review": "2026-11-23"
+   "mode": "report",
+   "since": "2026-11-12",
+   "enforce_review": "2026-11-19"
   },
   "investments": {
    "mode": "report",
@@ -107,7 +107,8 @@
   "knowledge": {
    "mode": "planned",
    "report_by": "2026-11-16",
-   "enforce_review": "2026-11-23"
+   "enforce_review": "2026-11-23",
+   "note": "code (platform-knowledge-api 37f4726) and vars staged; ships with the next catalog deploy (scripts/deploy_catalog.py, federated source)"
   },
   "learning": {
    "mode": "report",
@@ -140,49 +141,49 @@
    "enforce_review": "2026-11-19"
   },
   "platform-commerce": {
-   "mode": "planned",
-   "report_by": "2026-11-20",
-   "enforce_review": "2026-11-27"
+   "mode": "report",
+   "since": "2026-11-12",
+   "enforce_review": "2026-11-19"
   },
   "platform-communication": {
-   "mode": "planned",
-   "report_by": "2026-11-20",
-   "enforce_review": "2026-11-27"
+   "mode": "report",
+   "since": "2026-11-12",
+   "enforce_review": "2026-11-19"
   },
   "platform-data": {
-   "mode": "planned",
-   "report_by": "2026-11-20",
-   "enforce_review": "2026-11-27"
+   "mode": "report",
+   "since": "2026-11-12",
+   "enforce_review": "2026-11-19"
   },
   "platform-developer": {
-   "mode": "planned",
-   "report_by": "2026-11-20",
-   "enforce_review": "2026-11-27"
+   "mode": "report",
+   "since": "2026-11-12",
+   "enforce_review": "2026-11-19"
   },
   "platform-logistics": {
-   "mode": "planned",
-   "report_by": "2026-11-20",
-   "enforce_review": "2026-11-27"
+   "mode": "report",
+   "since": "2026-11-12",
+   "enforce_review": "2026-11-19"
   },
   "platform-media": {
-   "mode": "planned",
-   "report_by": "2026-11-20",
-   "enforce_review": "2026-11-27"
+   "mode": "report",
+   "since": "2026-11-12",
+   "enforce_review": "2026-11-19"
   },
   "platform-payment": {
-   "mode": "planned",
-   "report_by": "2026-11-20",
-   "enforce_review": "2026-11-27"
+   "mode": "report",
+   "since": "2026-11-12",
+   "enforce_review": "2026-11-19"
   },
   "platform-security": {
-   "mode": "planned",
-   "report_by": "2026-11-20",
-   "enforce_review": "2026-11-27"
+   "mode": "report",
+   "since": "2026-11-12",
+   "enforce_review": "2026-11-19"
   },
   "platform-workflow": {
-   "mode": "planned",
-   "report_by": "2026-11-20",
-   "enforce_review": "2026-11-27"
+   "mode": "report",
+   "since": "2026-11-12",
+   "enforce_review": "2026-11-19"
   },
   "projects": {
    "mode": "report",
@@ -205,9 +206,9 @@
    "enforce_review": "2026-11-19"
   },
   "saas-catalog": {
-   "mode": "planned",
-   "report_by": "2026-11-16",
-   "enforce_review": "2026-11-23"
+   "mode": "report",
+   "since": "2026-11-12",
+   "enforce_review": "2026-11-19"
   },
   "subscriptions": {
    "mode": "report",

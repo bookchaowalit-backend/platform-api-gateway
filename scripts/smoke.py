@@ -43,7 +43,9 @@ def main() -> int:
         failures.append(f"/healthz {code}")
     for system in sorted(routes):
         code = status(f"/v1/{system}/openapi.json")
-        if code in (-404, 0) or code >= 500:  # an upstream may hide its docs (404); the route must exist
+        # An upstream may hide its docs (its own 404); the route must exist (not the gateway's -404),
+        # be answered (not 0 or 5xx) and not be the gateway's own rate limit (429 never reached it).
+        if code in (-404, 0, 429) or code >= 500:
             failures.append(f"/v1/{system}/openapi.json {code}")
         time.sleep(0.25)  # under the 60 req / 10 s edge rule and the public per-IP limit
     for system in SAMPLE:
