@@ -50,6 +50,9 @@
   "transactions": "https://transactions-api-production-4078.up.railway.app"
  },
  "limits": {
+  "finance-api": {
+   "max_body_bytes": 8388608
+  },
   "knowledge": {
    "max_body_bytes": 16777216
   }
