@@ -15,7 +15,7 @@ customer payload.
 `/v1/<system>/<path>` is the production ingress for the registry's services:
 `https://gateway.bookchaowalit.com`, proxied by Cloudflare, on Railway (Singapore). It
 rejects requests that did not come through Cloudflare (`X-Gateway-Edge`), verifies RS256
-tokens from the trusted issuers (platform-identity, empire-platform) against their JWKS,
+tokens from the trusted issuers (platform-identity, empire-platform, Solo Web) against their JWKS,
 limits failed tokens per client IP and requests per subject, adds `X-Request-ID`, HSTS and
 `nosniff`, and passes the caller's token through so each service keeps its own audience and
 scope checks. Routes come from `routes.json`, generated from the hub registry with
@@ -23,6 +23,11 @@ scope checks. Routes come from `routes.json`, generated from the hub registry wi
 reads the hub. Requirements and acceptance criteria:
 [docs/specs/001-edge-gateway.md](docs/specs/001-edge-gateway.md); surface: [API.md](API.md).
 Consumers move one at a time; the direct service URLs keep working until a cutover is recorded.
+Services prove a request came through the gateway with SPEC-002
+([docs/specs/002-gateway-assertion.md](docs/specs/002-gateway-assertion.md)); the state of each
+route is in `assertion-status.json`. The production standard — route contract, onboarding
+checklist, observability, key rotation, deploy (`scripts/deploy.sh` + `scripts/smoke.py`) and the
+outage runbook — is [docs/specs/003-production-standard.md](docs/specs/003-production-standard.md).
 
 ## Boundary
 

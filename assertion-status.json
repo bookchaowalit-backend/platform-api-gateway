@@ -1,0 +1,233 @@
+{
+ "version": 1,
+ "description": "SPEC-002 assertion state per gateway route; scripts/check.py requires one entry per route (docs/specs/003-production-standard.md).",
+ "routes": {
+  "accounts": {
+   "mode": "report",
+   "since": "2026-11-12",
+   "enforce_review": "2026-11-19"
+  },
+  "ai-gateway": {
+   "mode": "planned",
+   "report_by": "2026-11-20",
+   "enforce_review": "2026-11-27"
+  },
+  "automation": {
+   "mode": "report",
+   "since": "2026-11-12",
+   "enforce_review": "2026-11-19"
+  },
+  "book-job-data": {
+   "mode": "planned",
+   "report_by": "2026-11-20",
+   "enforce_review": "2026-11-27"
+  },
+  "budgets": {
+   "mode": "report",
+   "since": "2026-11-12",
+   "enforce_review": "2026-11-19"
+  },
+  "business-assets": {
+   "mode": "report",
+   "since": "2026-11-12",
+   "enforce_review": "2026-11-19"
+  },
+  "cash-flow": {
+   "mode": "report",
+   "since": "2026-11-12",
+   "enforce_review": "2026-11-19"
+  },
+  "content": {
+   "mode": "report",
+   "since": "2026-11-12",
+   "enforce_review": "2026-11-19"
+  },
+  "crm": {
+   "mode": "planned",
+   "report_by": "2026-11-16",
+   "enforce_review": "2026-11-23"
+  },
+  "crm-income": {
+   "mode": "planned",
+   "report_by": "2026-11-16",
+   "enforce_review": "2026-11-23"
+  },
+  "decisions": {
+   "mode": "planned",
+   "report_by": "2026-11-16",
+   "enforce_review": "2026-11-23"
+  },
+  "diary": {
+   "mode": "enforce",
+   "since": "2026-11-12"
+  },
+  "empire-platform": {
+   "mode": "exempt",
+   "reason": "Decision B pending: every cell calls tasks-api directly (authz/begin/finish/publish); enforce only after the owner picks gateway-with-origin-exemption or private networking (docs/specs/003-production-standard.md)"
+  },
+  "finance-accounts": {
+   "mode": "report",
+   "since": "2026-11-11",
+   "enforce_review": "2026-11-18"
+  },
+  "finance-api": {
+   "mode": "report",
+   "since": "2026-11-11",
+   "enforce_review": "2026-11-18"
+  },
+  "goals": {
+   "mode": "report",
+   "since": "2026-11-12",
+   "enforce_review": "2026-11-19"
+  },
+  "habits": {
+   "mode": "enforce",
+   "since": "2026-11-10"
+  },
+  "health": {
+   "mode": "report",
+   "since": "2026-11-11",
+   "enforce_review": "2026-11-18"
+  },
+  "intake": {
+   "mode": "report",
+   "since": "2026-11-12",
+   "enforce_review": "2026-11-19"
+  },
+  "integrations": {
+   "mode": "planned",
+   "report_by": "2026-11-16",
+   "enforce_review": "2026-11-23"
+  },
+  "investments": {
+   "mode": "report",
+   "since": "2026-11-12",
+   "enforce_review": "2026-11-19"
+  },
+  "knowledge": {
+   "mode": "planned",
+   "report_by": "2026-11-16",
+   "enforce_review": "2026-11-23"
+  },
+  "learning": {
+   "mode": "report",
+   "since": "2026-11-12",
+   "enforce_review": "2026-11-19"
+  },
+  "liabilities": {
+   "mode": "report",
+   "since": "2026-11-12",
+   "enforce_review": "2026-11-19"
+  },
+  "notifications": {
+   "mode": "report",
+   "since": "2026-11-11",
+   "enforce_review": "2026-11-18"
+  },
+  "offers": {
+   "mode": "report",
+   "since": "2026-11-12",
+   "enforce_review": "2026-11-19"
+  },
+  "operating": {
+   "mode": "report",
+   "since": "2026-11-12",
+   "enforce_review": "2026-11-19"
+  },
+  "opportunities": {
+   "mode": "report",
+   "since": "2026-11-12",
+   "enforce_review": "2026-11-19"
+  },
+  "platform-commerce": {
+   "mode": "planned",
+   "report_by": "2026-11-20",
+   "enforce_review": "2026-11-27"
+  },
+  "platform-communication": {
+   "mode": "planned",
+   "report_by": "2026-11-20",
+   "enforce_review": "2026-11-27"
+  },
+  "platform-data": {
+   "mode": "planned",
+   "report_by": "2026-11-20",
+   "enforce_review": "2026-11-27"
+  },
+  "platform-developer": {
+   "mode": "planned",
+   "report_by": "2026-11-20",
+   "enforce_review": "2026-11-27"
+  },
+  "platform-logistics": {
+   "mode": "planned",
+   "report_by": "2026-11-20",
+   "enforce_review": "2026-11-27"
+  },
+  "platform-media": {
+   "mode": "planned",
+   "report_by": "2026-11-20",
+   "enforce_review": "2026-11-27"
+  },
+  "platform-payment": {
+   "mode": "planned",
+   "report_by": "2026-11-20",
+   "enforce_review": "2026-11-27"
+  },
+  "platform-security": {
+   "mode": "planned",
+   "report_by": "2026-11-20",
+   "enforce_review": "2026-11-27"
+  },
+  "platform-workflow": {
+   "mode": "planned",
+   "report_by": "2026-11-20",
+   "enforce_review": "2026-11-27"
+  },
+  "projects": {
+   "mode": "report",
+   "since": "2026-11-12",
+   "enforce_review": "2026-11-19"
+  },
+  "radar": {
+   "mode": "report",
+   "since": "2026-11-12",
+   "enforce_review": "2026-11-19"
+  },
+  "reconciliations": {
+   "mode": "report",
+   "since": "2026-11-11",
+   "enforce_review": "2026-11-18"
+  },
+  "roles-skills": {
+   "mode": "report",
+   "since": "2026-11-12",
+   "enforce_review": "2026-11-19"
+  },
+  "saas-catalog": {
+   "mode": "planned",
+   "report_by": "2026-11-16",
+   "enforce_review": "2026-11-23"
+  },
+  "subscriptions": {
+   "mode": "report",
+   "since": "2026-11-12",
+   "enforce_review": "2026-11-19"
+  },
+  "tax": {
+   "mode": "report",
+   "since": "2026-11-12",
+   "enforce_review": "2026-11-19"
+  },
+  "time": {
+   "mode": "report",
+   "since": "2026-11-11",
+   "enforce_review": "2026-11-18"
+  },
+  "transactions": {
+   "mode": "report",
+   "since": "2026-11-11",
+   "enforce_review": "2026-11-18"
+  }
+ }
+}
