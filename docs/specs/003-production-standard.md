@@ -83,12 +83,21 @@ inventory), set the mode back to `report`, or remove the route. No step deletes 
   (`extra_audiences` in platform-empire), and a service that grants owner access names the allowed
   subjects. Next step: scope-based authorization in such services instead of owner access.
 
-## 5. Decision B (pending owner choice)
+## 5. Decision B (decided 2026-11-12: stay direct)
 
-Cells call tasks-api (`EMPIRE_PLATFORM_URL`) directly for authz decide, begin/finish and publish on
-every write, so `empire-platform` is `exempt`. Options: (a) through the gateway with a rate-limit
-exemption for traffic that carries the origin header, (b) Railway private networking plus service
-auth. Measured overhead and limits are in section 8; nothing changes until the owner picks one.
+Cells call tasks-api (`EMPIRE_PLATFORM_URL`) for authz decide, begin/finish and publish on every
+write. Owner decision 2026-11-12: these calls stay direct, so `empire-platform` is `exempt`.
+
+- Through the gateway (option a) each call costs about +65 ms server to server (section 8), so a write
+  pays +200–260 ms, and all cells share one Railway egress, so they would compete for the
+  60 req / 10 s edge rule.
+- Railway private networking (option b) costs nothing and has no egress fees, but it only connects
+  services inside one project and environment; tasks-api is in `platform-empire` and each cell has its
+  own project (about 40), so it would mean moving every cell into one project (new services, variables,
+  CD, crons and domains for each) for ~10–20 ms per call.
+- tasks-api verifies its own RS256 tokens, so the direct path keeps the same caller check.
+
+Revisit only if the cells are consolidated into one Railway project.
 
 ## 6. Deploy
 

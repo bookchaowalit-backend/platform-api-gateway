@@ -63,7 +63,7 @@
   },
   "empire-platform": {
    "mode": "exempt",
-   "reason": "Decision B pending: every cell calls tasks-api directly (authz/begin/finish/publish); enforce only after the owner picks gateway-with-origin-exemption or private networking (docs/specs/003-production-standard.md)"
+   "reason": "Decision B (owner, 2026-11-12): cells keep calling tasks-api directly (authz decide, begin/finish, publish on every write). Through the gateway each call costs ~+65 ms and every write shares the 60 req/10 s edge rule; Railway private networking only works inside one project, and the cells live in ~40 separate projects. tasks-api checks its own RS256 tokens. Revisit if the cells are ever consolidated into one project."
   },
   "finance-accounts": {
    "mode": "report",
