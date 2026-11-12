@@ -22,13 +22,36 @@ fi
 : "${GATEWAY_RAILWAY_PROJECT:=451cd409-8aa1-437f-b2d3-2f2da7627209}"
 : "${GATEWAY_RAILWAY_ENVIRONMENT:=c96ce799-05d0-417e-a1d9-573d9dde0b67}"
 : "${GATEWAY_RAILWAY_SERVICE:=a2c21011-3e2d-4af6-9366-2c4b2ae6306b}"
+export GATEWAY_RAILWAY_PROJECT GATEWAY_RAILWAY_ENVIRONMENT GATEWAY_RAILWAY_SERVICE
+started="$(date -u +%Y-%m-%dT%H:%M:%S)"
 (cd "$work" && railway up --ci -p "$GATEWAY_RAILWAY_PROJECT" -e "$GATEWAY_RAILWAY_ENVIRONMENT" \
   -s "$GATEWAY_RAILWAY_SERVICE" -m "$sha $(git log -1 --format=%s "$ref" | cut -c1-60)" | tail -1)
-# `railway up --ci` returns after the build; the new deployment may still be starting. Retry the
-# smoke test (it uses the routes of THIS checkout) for up to five minutes, 70 s apart so its three
-# tokenless calls never add up to the failed-token limit (10 per minute per IP).
-for attempt in 1 2 3 4 5; do
-  if python3 "$root/scripts/smoke.py"; then
+# `railway up --ci` returns after the build. Wait until the deployment created by this upload is
+# SUCCESS (the one serving traffic), then smoke-test it.
+python3 - "$started" <<'PY' || { echo "the new deployment did not become SUCCESS; roll back with REF=<previous sha>" >&2; exit 1; }
+import json, os, sys, time, urllib.request
+since = sys.argv[1]
+q = ("query($p:String!,$e:String!,$s:String!){ deployments(first:1, input:{projectId:$p, environmentId:$e,"
+     " serviceId:$s}){ edges { node { status createdAt } } } }")
+v = {"p": os.environ["GATEWAY_RAILWAY_PROJECT"], "e": os.environ["GATEWAY_RAILWAY_ENVIRONMENT"],
+     "s": os.environ["GATEWAY_RAILWAY_SERVICE"]}
+for _ in range(60):
+    req = urllib.request.Request("https://backboard.railway.com/graphql/v2", json.dumps({"query": q, "variables": v}).encode(),
+                                 headers={"Authorization": "Bearer " + os.environ["RAILWAY_API_TOKEN"], "Content-Type": "application/json"})
+    node = json.load(urllib.request.urlopen(req, timeout=30))["data"]["deployments"]["edges"][0]["node"]
+    if node["createdAt"] >= since and node["status"] == "SUCCESS":
+        sys.exit(0)
+    if node["createdAt"] >= since and node["status"] in ("FAILED", "CRASHED", "REMOVED"):
+        sys.exit(1)
+    time.sleep(10)
+sys.exit(1)
+PY
+# Smoke the deployed ref's own route table, at GATEWAY_URL (default production), from THIS checkout's
+# script (a rollback ref may predate it). Retried 70 s apart: three tokenless calls per run stay under
+# the failed-token limit (10 per minute per IP).
+routes="$work/routes.json"
+for attempt in 1 2 3; do
+  if python3 "$root/scripts/smoke.py" "${GATEWAY_URL:-https://gateway.bookchaowalit.com}" --routes "$routes"; then
     echo "deployed $sha"
     exit 0
   fi

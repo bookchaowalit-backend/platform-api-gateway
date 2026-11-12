@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """Post-deploy smoke test of the public edge (SPEC-003). No token is used or needed.
 
-    python3 scripts/smoke.py [https://gateway.bookchaowalit.com]
+    python3 scripts/smoke.py [BASE_URL] [--routes PATH]
+
+BASE_URL defaults to $GATEWAY_URL, else https://gateway.bookchaowalit.com; --routes defaults to this
+checkout's routes.json (deploy.sh passes the deployed ref's table).
 
 Checks: /healthz 200; every route's tokenless /openapi.json (the one tokenless path) reaches its
 service (not the gateway's own 404, not 5xx);
@@ -12,6 +15,7 @@ failed-token limit of 10 per minute per IP); an unknown route is 404. Exit 1 on 
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
 import urllib.error
@@ -20,7 +24,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SAMPLE = ("habits", "knowledge", "crm")  # 3 tokenless failures per run; the lock is 10 per minute per IP
-BASE = (sys.argv[1] if len(sys.argv) > 1 else "https://gateway.bookchaowalit.com").rstrip("/")
+_args = sys.argv[1:]
+ROUTES = Path(_args[_args.index("--routes") + 1]) if "--routes" in _args else ROOT / "routes.json"
+_positional = [a for i, a in enumerate(_args) if a != "--routes" and (i == 0 or _args[i - 1] != "--routes")]
+BASE = (_positional[0] if _positional else os.environ.get("GATEWAY_URL", "https://gateway.bookchaowalit.com")).rstrip("/")
 
 
 def status(path: str) -> int:
@@ -37,7 +44,7 @@ def status(path: str) -> int:
 
 
 def main() -> int:
-    routes = json.loads((ROOT / "routes.json").read_text())["routes"]
+    routes = json.loads(ROUTES.read_text())["routes"]
     failures = []
     if (code := status("/healthz")) != 200:
         failures.append(f"/healthz {code}")
