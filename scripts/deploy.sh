@@ -58,11 +58,11 @@ for _ in range(90):
     except (urllib.error.URLError, TimeoutError, KeyError, TypeError, ValueError):
         time.sleep(10)
         continue
-    if wanted:
-        mine = next((n for n in nodes if n["id"] == wanted), None)
-    else:
-        newer = [n for n in nodes if n["id"] != before]
-        mine = newer[0] if newer and nodes[0]["id"] != before else None
+    if not wanted and nodes and nodes[0]["id"] != before:
+        # The first deployment newer than the one live before the upload is this upload's; pin it, so a
+        # later deployment (another push, a variable change) is never mistaken for it.
+        wanted = nodes[0]["id"]
+    mine = next((n for n in nodes if n["id"] == wanted), None) if wanted else None
     if mine and mine["status"] == "SUCCESS":
         sys.exit(0)
     if mine and mine["status"] in ("FAILED", "CRASHED", "REMOVED", "SKIPPED"):
