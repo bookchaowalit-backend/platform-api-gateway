@@ -147,7 +147,7 @@
    "mode": "report",
    "since": "2026-11-12",
    "enforce_review": "2026-11-19",
-   "note": "2026-11-18 review: email recipients open /v1/unsubscribe on COMMUNICATION_PUBLIC_URL (the direct origin) with no bearer token. platform-communication 201d76e adds that exact path to OPEN_PATHS; deploy it before enforce"
+   "note": "2026-11-18 review: email recipients open /v1/unsubscribe on COMMUNICATION_PUBLIC_URL (the direct origin) with no bearer token. platform-communication 201d76e adds that exact path to OPEN_PATHS; deployed 2026-11-18 (Railway 44755262): the exact path logs no assertion result, /v1/unsubscribe/x still logs missing, /healthz and /readyz 200"
   },
   "platform-data": {
    "mode": "report",
@@ -173,7 +173,7 @@
    "mode": "report",
    "since": "2026-11-12",
    "enforce_review": "2026-11-19",
-   "note": "2026-11-18 review: Stripe posts POST /v1/webhooks/provider directly (4 missing on 11-17; it has no bearer token, so it cannot use the gateway). platform-payment 0215a4d adds that exact path to OPEN_PATHS (Stripe-Signature authenticates it); deploy it before enforce"
+   "note": "2026-11-18 review: Stripe posts POST /v1/webhooks/provider directly (4 missing on 11-17; it has no bearer token, so it cannot use the gateway). platform-payment 0215a4d adds that exact path to OPEN_PATHS (Stripe-Signature authenticates it); deployed 2026-11-18 (Railway 6a8b5f83): the exact path logs no assertion result, /v1/webhooks/provider/x still logs missing, /healthz and /readyz 200"
   },
   "platform-security": {
    "mode": "report",
