@@ -146,7 +146,8 @@
   "platform-communication": {
    "mode": "report",
    "since": "2026-11-12",
-   "enforce_review": "2026-11-19"
+   "enforce_review": "2026-11-19",
+   "note": "2026-11-18 review: email recipients open /v1/unsubscribe on COMMUNICATION_PUBLIC_URL (the direct origin) with no bearer token. platform-communication 201d76e adds that exact path to OPEN_PATHS; deploy it before enforce"
   },
   "platform-data": {
    "mode": "report",
@@ -171,7 +172,8 @@
   "platform-payment": {
    "mode": "report",
    "since": "2026-11-12",
-   "enforce_review": "2026-11-19"
+   "enforce_review": "2026-11-19",
+   "note": "2026-11-18 review: Stripe posts POST /v1/webhooks/provider directly (4 missing on 11-17; it has no bearer token, so it cannot use the gateway). platform-payment 0215a4d adds that exact path to OPEN_PATHS (Stripe-Signature authenticates it); deploy it before enforce"
   },
   "platform-security": {
    "mode": "report",
