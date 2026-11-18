@@ -208,7 +208,7 @@
   "_redeploy": [
    "`git archive main` of bookchaowalit-backend/<system> into a temp dir; `railway link -p <system> -s <service>` there; `railway up --ci`; check https://<upstream host>/readyz is 200",
    "add the upstream back to routes.json and move this entry back into `routes` with mode report (fresh since/enforce_review); deploy with scripts/deploy.sh",
-   "restore the platform-uptime-worker target + SLEEPS entry, the platform-mcp-remote-worker cell, and set status online in bookchaowalit-empire repository-catalog/registries/online-systems.yaml"
+   "restore the platform-uptime-worker target + SLEEPS entry and set status online in bookchaowalit-empire repository-catalog/registries/online-systems.yaml; the platform-mcp-remote-worker cell was left in place (a hub deploy needs owner approval) and works again once the route is back"
   ],
   "platform-media": {
    "archived": "2026-11-18",
