@@ -70,8 +70,10 @@
    "since": "2026-11-18"
   },
   "finance-api": {
-   "mode": "enforce",
-   "since": "2026-11-18"
+   "mode": "report",
+   "since": "2026-11-11",
+   "enforce_review": "2026-11-25",
+   "note": "identity-api, the one legitimate direct caller, moved IDENTITY_ENTITLEMENT_URL to the gateway on 2026-11-18 (platform-identity e64b3e9; a 429 counts as no pass since 87aac37); enforce after 7 clean days of report (SPEC-002 R6). Briefly enforced 2026-11-18 and set back to report the same day"
   },
   "goals": {
    "mode": "report",
