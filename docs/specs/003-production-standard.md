@@ -111,6 +111,9 @@ Revisit only if the cells are consolidated into one Railway project.
 1. Confirm: uptime alert, `scripts/smoke.py`, Railway deployment state of `platform-api-gateway`,
    Cloudflare status. A 403 for every call means the edge secret and the Transform Rule disagree.
 2. If a deploy caused it: `REF=<last good sha> scripts/deploy.sh`.
+   If that sha predates a route removal (for example the six routes archived 2026-11-18, commit e85b02b),
+   cherry-pick the removal onto a branch from that sha and deploy that commit instead, so archived
+   routes do not come back (`assertion-status.json` `archived._rollback`).
 3. If the gateway cannot be restored within 15 minutes: set every `enforce` service to `report`
    (they then accept direct calls), and point the urgent callers back to their direct origin
    (rollback values are in the inventory and the comments next to each variable).

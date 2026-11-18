@@ -208,7 +208,7 @@
   "_redeploy": [
    "`git archive main` of bookchaowalit-backend/<system> into a temp dir; `railway link -p <system> -s <service>` there; `railway up --ci`; check https://<upstream host>/readyz is 200",
    "add the upstream back to routes.json and move this entry back into `routes` with mode report (fresh since/enforce_review); merge that commit to origin/main first (scripts/deploy.sh deploys origin/main unless REF=<restore commit> is set), run scripts/deploy.sh, then check GET https://gateway.bookchaowalit.com/v1/<system>/readyz no longer answers the gateway's route-not-found 404",
-   "restore the platform-uptime-worker target + SLEEPS entry and set status online in bookchaowalit-empire repository-catalog/registries/online-systems.yaml; the platform-mcp-remote-worker cell was left in place (a hub deploy needs owner approval) and works again once the route is back"
+   "restore the platform-uptime-worker target + SLEEPS entry and, in the same commit, move that service from the 'does not probe the six services archived 2026-11-18' test to the /readyz host table in test/targets.test.ts (the archived test fails otherwise); set status online in bookchaowalit-empire repository-catalog/registries/online-systems.yaml; re-add its platform-mcp-remote-worker cell if the hub dropped it (owner board item mcp-hub-drop-archived-cells)"
   ],
   "platform-media": {
    "archived": "2026-11-18",
@@ -282,6 +282,6 @@
     "enforce_review": "2026-11-19"
    }
   },
-  "_rollback": "Rolling the gateway back to a ref before 85340b9 (REF=<sha> scripts/deploy.sh, SPEC-003) would bring these six routes back pointing at removed deployments, and the smoke test accepts an upstream 404. Roll back with a ref that keeps the archive: cherry-pick 85340b9 onto the rollback ref, or deploy that ref and then confirm the six paths still answer the gateway's route-not-found 404."
+  "_rollback": "A ref before e85b02b (merged as 85340b9) still routes these six systems to removed deployments, and the smoke test accepts an upstream 404, so never deploy such a ref as it is. Make a rollback branch from the last good sha, run `git cherry-pick e85b02b` (the non-merge commit that drops the routes), check that routes.json has none of the six, then deploy it with REF=<that commit> scripts/deploy.sh."
  }
 }
