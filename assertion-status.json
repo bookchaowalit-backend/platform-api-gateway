@@ -138,36 +138,11 @@
    "since": "2026-11-12",
    "enforce_review": "2026-11-19"
   },
-  "platform-commerce": {
-   "mode": "report",
-   "since": "2026-11-12",
-   "enforce_review": "2026-11-19"
-  },
   "platform-communication": {
    "mode": "report",
    "since": "2026-11-12",
    "enforce_review": "2026-11-19",
    "note": "2026-11-18 review: email recipients open /v1/unsubscribe on COMMUNICATION_PUBLIC_URL (the direct origin) with no bearer token. platform-communication 201d76e adds that exact path to OPEN_PATHS; deployed 2026-11-18 (Railway 44755262): the exact path logs no assertion result, /v1/unsubscribe/x still logs missing, /healthz and /readyz 200"
-  },
-  "platform-data": {
-   "mode": "report",
-   "since": "2026-11-12",
-   "enforce_review": "2026-11-19"
-  },
-  "platform-developer": {
-   "mode": "report",
-   "since": "2026-11-12",
-   "enforce_review": "2026-11-19"
-  },
-  "platform-logistics": {
-   "mode": "report",
-   "since": "2026-11-12",
-   "enforce_review": "2026-11-19"
-  },
-  "platform-media": {
-   "mode": "report",
-   "since": "2026-11-12",
-   "enforce_review": "2026-11-19"
   },
   "platform-payment": {
    "mode": "report",
@@ -176,11 +151,6 @@
    "note": "2026-11-18 review: Stripe posts POST /v1/webhooks/provider directly (4 missing on 11-17; it has no bearer token, so it cannot use the gateway). platform-payment 0215a4d adds that exact path to OPEN_PATHS (Stripe-Signature authenticates it); deployed 2026-11-18 (Railway 6a8b5f83): the exact path logs no assertion result, /v1/webhooks/provider/x still logs missing, /healthz and /readyz 200"
   },
   "platform-security": {
-   "mode": "report",
-   "since": "2026-11-12",
-   "enforce_review": "2026-11-19"
-  },
-  "platform-workflow": {
    "mode": "report",
    "since": "2026-11-12",
    "enforce_review": "2026-11-19"
@@ -231,6 +201,86 @@
   "transactions": {
    "mode": "enforce",
    "since": "2026-11-18"
+  }
+ },
+ "archived": {
+  "_about": "Routes removed 2026-11-18 by architecture-docs SCALE-READINESS D2 (no caller; Railway compute is the binding budget). Their Railway deployments were removed; Railway projects, variables, domains, Neon DBs and Infisical paths are kept. Not part of `routes` (tests/test_assertion_status.py), so the gateway answers 404 for them.",
+  "_redeploy": [
+   "`git archive main` of bookchaowalit-backend/<system> into a temp dir; `railway link -p <system> -s <service>` there; `railway up --ci`; check https://<upstream host>/readyz is 200",
+   "add the upstream back to routes.json and move this entry back into `routes` with mode report (fresh since/enforce_review); deploy with scripts/deploy.sh",
+   "restore the platform-uptime-worker target + SLEEPS entry, the platform-mcp-remote-worker cell, and set status online in bookchaowalit-empire repository-catalog/registries/online-systems.yaml"
+  ],
+  "platform-media": {
+   "archived": "2026-11-18",
+   "railway_project": "platform-media",
+   "service": "media-api",
+   "upstream": "https://media-api-production-91a5.up.railway.app",
+   "removed_deployment": "c506c1d7-82fe-4c81-82d3-d9dec55a0d74",
+   "mode_before": {
+    "mode": "report",
+    "since": "2026-11-12",
+    "enforce_review": "2026-11-19"
+   }
+  },
+  "platform-data": {
+   "archived": "2026-11-18",
+   "railway_project": "platform-data",
+   "service": "data-api",
+   "upstream": "https://data-api-production-bf8a.up.railway.app",
+   "removed_deployment": "5397cac0-ab0d-4439-9469-9c98464084d2",
+   "mode_before": {
+    "mode": "report",
+    "since": "2026-11-12",
+    "enforce_review": "2026-11-19"
+   }
+  },
+  "platform-workflow": {
+   "archived": "2026-11-18",
+   "railway_project": "platform-workflow",
+   "service": "workflow-api",
+   "upstream": "https://workflow-api-production-63de.up.railway.app",
+   "removed_deployment": "c40f5eb1-3f82-4654-9e64-528de97599d4",
+   "mode_before": {
+    "mode": "report",
+    "since": "2026-11-12",
+    "enforce_review": "2026-11-19"
+   }
+  },
+  "platform-commerce": {
+   "archived": "2026-11-18",
+   "railway_project": "platform-commerce",
+   "service": "commerce-api",
+   "upstream": "https://commerce-api-production-9b24.up.railway.app",
+   "removed_deployment": "390434f3-58ab-4564-8048-c2b484163398",
+   "mode_before": {
+    "mode": "report",
+    "since": "2026-11-12",
+    "enforce_review": "2026-11-19"
+   }
+  },
+  "platform-logistics": {
+   "archived": "2026-11-18",
+   "railway_project": "platform-logistics",
+   "service": "logistics-api",
+   "upstream": "https://logistics-api-production-d3bb.up.railway.app",
+   "removed_deployment": "00993481-d8c6-4a28-a46b-7a8d48efe9cc",
+   "mode_before": {
+    "mode": "report",
+    "since": "2026-11-12",
+    "enforce_review": "2026-11-19"
+   }
+  },
+  "platform-developer": {
+   "archived": "2026-11-18",
+   "railway_project": "platform-developer",
+   "service": "developer-api",
+   "upstream": "https://developer-api-production-2fad.up.railway.app",
+   "removed_deployment": "55a2c7d1-3acb-4ad7-8eb5-f279c31cd9a0",
+   "mode_before": {
+    "mode": "report",
+    "since": "2026-11-12",
+    "enforce_review": "2026-11-19"
+   }
   }
  }
 }
