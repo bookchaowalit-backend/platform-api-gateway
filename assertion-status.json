@@ -66,14 +66,14 @@
    "reason": "Decision B (owner, 2026-11-12): cells keep calling tasks-api directly (authz decide, begin/finish, publish on every write). Through the gateway each call costs ~+65 ms and every write shares the 60 req/10 s edge rule; Railway private networking only works inside one project, and the cells live in ~40 separate projects. tasks-api checks its own RS256 tokens. Revisit if the cells are ever consolidated into one project."
   },
   "finance-accounts": {
-   "mode": "report",
-   "since": "2026-11-11",
-   "enforce_review": "2026-11-18"
+   "mode": "enforce",
+   "since": "2026-11-18"
   },
   "finance-api": {
    "mode": "report",
    "since": "2026-11-11",
-   "enforce_review": "2026-11-18"
+   "enforce_review": "2026-12-02",
+   "note": "2026-11-18 review: identity-api calls IDENTITY_ENTITLEMENT_URL (/v1/internal/entitlement) on the direct origin, and its config accepts only a bare https origin, so the gateway path cannot be set yet; identity must accept the gateway URL before enforce (entitlement mode is shadow today)"
   },
   "goals": {
    "mode": "report",
@@ -85,9 +85,8 @@
    "since": "2026-11-10"
   },
   "health": {
-   "mode": "report",
-   "since": "2026-11-11",
-   "enforce_review": "2026-11-18"
+   "mode": "enforce",
+   "since": "2026-11-18"
   },
   "intake": {
    "mode": "report",
@@ -121,9 +120,8 @@
    "enforce_review": "2026-11-19"
   },
   "notifications": {
-   "mode": "report",
-   "since": "2026-11-11",
-   "enforce_review": "2026-11-18"
+   "mode": "enforce",
+   "since": "2026-11-18"
   },
   "offers": {
    "mode": "report",
@@ -196,9 +194,8 @@
    "enforce_review": "2026-11-19"
   },
   "reconciliations": {
-   "mode": "report",
-   "since": "2026-11-11",
-   "enforce_review": "2026-11-18"
+   "mode": "enforce",
+   "since": "2026-11-18"
   },
   "roles-skills": {
    "mode": "report",
@@ -221,9 +218,8 @@
    "enforce_review": "2026-11-19"
   },
   "time": {
-   "mode": "report",
-   "since": "2026-11-11",
-   "enforce_review": "2026-11-18"
+   "mode": "enforce",
+   "since": "2026-11-18"
   },
   "tracking": {
    "mode": "report",
@@ -231,9 +227,8 @@
    "enforce_review": "2026-11-19"
   },
   "transactions": {
-   "mode": "report",
-   "since": "2026-11-11",
-   "enforce_review": "2026-11-18"
+   "mode": "enforce",
+   "since": "2026-11-18"
   }
  }
 }
