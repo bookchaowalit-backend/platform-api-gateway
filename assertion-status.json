@@ -70,10 +70,8 @@
    "since": "2026-11-18"
   },
   "finance-api": {
-   "mode": "report",
-   "since": "2026-11-11",
-   "enforce_review": "2026-12-02",
-   "note": "2026-11-18 review: identity-api calls IDENTITY_ENTITLEMENT_URL (/v1/internal/entitlement) on the direct origin, and its config accepts only a bare https origin, so the gateway path cannot be set yet; identity must accept the gateway URL before enforce (entitlement mode is shadow today)"
+   "mode": "enforce",
+   "since": "2026-11-18"
   },
   "goals": {
    "mode": "report",
