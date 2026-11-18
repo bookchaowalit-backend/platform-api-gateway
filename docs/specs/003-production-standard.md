@@ -114,7 +114,8 @@ Revisit only if the cells are consolidated into one Railway project.
    If that sha predates a route removal (for example the six routes archived 2026-11-18, commit e85b02b),
    cherry-pick the removal onto a branch from that sha and deploy that commit instead, so archived
    routes do not come back (`assertion-status.json` `archived._rollback`). On a conflict, delete the
-   archived keys from `routes.json` by hand and run `scripts/check.sh` before deploying.
+   archived keys from `routes.json` by hand, run `scripts/check.sh` and commit (`git cherry-pick --continue`)
+   before deploying: `deploy.sh` archives the commit `REF` names, not the working tree.
 3. If the gateway cannot be restored within 15 minutes: set every `enforce` service to `report`
    (they then accept direct calls), and point the urgent callers back to their direct origin
    (rollback values are in the inventory and the comments next to each variable).
