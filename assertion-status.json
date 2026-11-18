@@ -73,7 +73,7 @@
    "mode": "report",
    "since": "2026-11-11",
    "enforce_review": "2026-11-25",
-   "note": "identity-api, the one legitimate direct caller, moved IDENTITY_ENTITLEMENT_URL to the gateway on 2026-11-18 (platform-identity e64b3e9; a 429 counts as no pass since 87aac37); enforce after 7 clean days of report (SPEC-002 R6). Briefly enforced 2026-11-18 and set back to report the same day. Before enforce (and before IDENTITY_ENTITLEMENT_MODE=enforce): every entitlement lookup shares one gateway subject (GATEWAY_SUBJECT_LIMIT_PER_MINUTE 120), and identity counts a 429 as no pass, so check the peak of uncached lookups (identity logs 'entitlement rate limited') and raise or exempt that subject's limit if it nears 120/min; 2026-11-11..18 finance-api saw 1 lookup"
+   "note": "identity-api, the one legitimate direct caller, moved IDENTITY_ENTITLEMENT_URL to the gateway on 2026-11-18 (platform-identity e64b3e9; a 429 counts as no pass since 87aac37); enforce after 7 clean days of report (SPEC-002 R6). Briefly enforced 2026-11-18 and set back to report the same day. Before enforce (and before IDENTITY_ENTITLEMENT_MODE=enforce): every entitlement lookup shares one gateway subject (GATEWAY_SUBJECT_LIMIT_PER_MINUTE 120), and identity counts a 429 as no pass, so check the peak of uncached lookups (identity logs 'entitlement rate limited') and raise or exempt that subject's limit if it nears 120/min; 2026-11-11..18 finance-api saw 1 lookup; the Cloudflare edge rule (60 / 10 s per colo + IP) applies on top and is shared with any other gateway call from identity's egress IP, so also check Cloudflare 429s for identity's IP at peak (raising the subject limit does not help there)"
   },
   "goals": {
    "mode": "report",
