@@ -15,13 +15,31 @@ gate: changed logic needs its own test.
 
 ## End to end
 
+Run as one script. Fake test values only: the issuer is never contacted (no request here reaches
+JWT key fetch), and with the edge on `/readyz` is 200 from the route table alone.
+
 ```bash
-PYTHONPATH=src GATEWAY_PORT=8099 python3 -m book_api_gateway.server &
+set -eu
+export PYTHONPATH=src GATEWAY_PORT=8099
+export GATEWAY_TRUSTED_ISSUERS='{"https://issuer.test.invalid":"https://issuer.test.invalid/jwks.json"}'
+export GATEWAY_EDGE_SECRET=local-test-edge-secret-0123456789abcdef   # 32+ chars, not a real secret
+python3 -m book_api_gateway.server & PID=$!
+trap 'kill $PID 2>/dev/null' EXIT
+for i in $(seq 50); do curl -fsS -o /dev/null localhost:8099/healthz 2>/dev/null && break; kill -0 $PID; sleep 0.2; done
 curl -fsS localhost:8099/healthz && curl -fsS localhost:8099/readyz
+E="X-Gateway-Edge: $GATEWAY_EDGE_SECRET"
+curl -s -o /dev/null -w 'no edge secret %{http_code}\n' localhost:8099/v1/crm/contacts          # 403
+curl -s -o /dev/null -w 'no token %{http_code}\n' -H "$E" localhost:8099/v1/crm/contacts         # 401
+curl -s -o /dev/null -w 'bad JWT %{http_code}\n' -H "$E" -H 'Authorization: Bearer x.y.z' \
+  localhost:8099/v1/crm/contacts                                                              # 401
+curl -s -o /dev/null -w 'unknown route %{http_code}\n' -H "$E" localhost:8099/v1/no-such/x       # 404
 ```
 
-For auth or routing changes, also show one request that must be refused (no edge secret, bad JWT,
-unknown route) and its status code.
+`kill -0` stops the wait if the new process died (for example port 8099 already taken). For auth
+or routing changes, show the refusal that matches the change and its status code; a 404 counts
+only from this edge-enabled run (without `GATEWAY_TRUSTED_ISSUERS`, every `/v1/` path is 404).
+For the pilot `/api/*` path, also set `BOOK_API_GATEWAY_TOKEN` and point `UPSTREAM_BASE_URL` at a
+loopback server.
 
 ## Never
 
