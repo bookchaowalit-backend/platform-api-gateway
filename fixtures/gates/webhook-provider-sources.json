@@ -1,6 +1,6 @@
 {
   "fixture": "boo-147.source-snapshots.v1",
-  "note": "Verbatim line excerpts of the sources the BOO-147 map is derived from. CI tests the fixture against these lines; with local checkouts (ARCHITECTURE_DOCS_ROOT, SOLO_EMPIRE_ROOT) the tests also re-read each line and sha256 from git.",
+  "note": "Verbatim line excerpts of the sources the BOO-147 map is derived from. CI tests the fixture against these lines; with local checkouts (ARCHITECTURE_DOCS_ROOT, SOLO_EMPIRE_ROOT) the tests also re-read each line and sha256 from git. The contract is also pinned to its version in the hosted store (space architecture-docs, SPEC-001); a store snapshot without .git is checked by that sha256.",
   "sources": [
     {
       "key": "contract",
@@ -8,6 +8,7 @@
       "commit": "a9c8472744e0f97599589a38afcd3ae5cc5c8a2a",
       "path": "systems/architecture/solo-empire-api-contract-v1.md",
       "git_blob": "5b75b15d57bd5b7841737d0636fc41dcf80c26b7",
+      "store": {"space": "architecture-docs", "version": 1},
       "sha256": "ceba7be61ac60479f63ff97db7e0c6603feb0deae5ac24d4778f895a4ec0e548",
       "lines": {
         "55": "### Authentication classes",

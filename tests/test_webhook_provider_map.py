@@ -55,6 +55,19 @@ SERVER_SOURCE = ROOT / "src" / "book_api_gateway" / "server.py"
 CONTRACT_SECTION = "### Signed and authenticated webhook routes"
 READ_ROUTES_SECTION = "### Authenticated AI and read-only integration routes"
 DEFAULT_ARCH_DOCS = ROOT.parents[3] / "bookchaowalit" / "private" / "architecture-docs"
+
+
+def architecture_documents() -> Path:
+    """The architecture documents: ARCHITECTURE_DOCS_ROOT / SOLO_ARCHITECTURE_ROOT, else the
+    checkout, else the hosted store snapshot (SOLO_ARCHITECTURE_SNAPSHOT, default
+    ~/.cache/solo-empire/architecture-docs, known by .snapshot.json; architecture-docs SPEC-001)."""
+    configured = os.environ.get("ARCHITECTURE_DOCS_ROOT") or os.environ.get("SOLO_ARCHITECTURE_ROOT")
+    if configured:
+        return Path(configured)
+    if DEFAULT_ARCH_DOCS.is_dir():
+        return DEFAULT_ARCH_DOCS
+    snapshot = Path(os.environ.get("SOLO_ARCHITECTURE_SNAPSHOT") or Path.home() / ".cache/solo-empire/architecture-docs")
+    return snapshot.resolve() if (snapshot / ".snapshot.json").is_file() else DEFAULT_ARCH_DOCS
 DEFAULT_SOLO_EMPIRE = ROOT.parents[8] if len(ROOT.parents) > 8 else None
 
 # Synthetic credentials only; nothing here is a real provider secret.
@@ -380,7 +393,7 @@ class LiveSourceDriftTests(unittest.TestCase):
     @staticmethod
     def _repo_root(key: str) -> Path | None:
         if key == "contract":
-            candidate = Path(os.environ.get("ARCHITECTURE_DOCS_ROOT") or DEFAULT_ARCH_DOCS)
+            candidate = architecture_documents()
         else:
             configured = os.environ.get("SOLO_EMPIRE_ROOT")
             if not configured and DEFAULT_SOLO_EMPIRE is None:
@@ -428,12 +441,27 @@ class LiveSourceDriftTests(unittest.TestCase):
             self.skipTest("pinned solo-empire commit not available locally")
         self.assertEqual(result.stdout.split(), tree["files"])
 
-    def test_live_contract_still_matches_snapshot(self) -> None:
-        repo = self._repo_root("contract")
+    def test_store_snapshot_contract_matches_the_store_pin(self) -> None:
+        # A store snapshot has no git history; its bytes are the pinned store version's when the
+        # sha256 matches, so the line excerpts are checked against them.
         entry = source("contract")
-        if repo is None or not (repo / entry["path"]).is_file():
-            self.skipTest("architecture-docs checkout not available (set ARCHITECTURE_DOCS_ROOT)")
-        raw = (repo / entry["path"]).read_bytes()
+        self.assertEqual(entry["store"], {"space": "architecture-docs", "version": 1})
+        root = architecture_documents()
+        if (root / ".git").exists() or not (root / entry["path"]).is_file():
+            self.skipTest("no store snapshot of architecture-docs (git checkouts are covered above)")
+        raw = (root / entry["path"]).read_bytes()
+        self.assertEqual(hashlib.sha256(raw).hexdigest(), entry["sha256"],
+                         "snapshot contract differs from the pinned store version; re-pin and re-map")
+        lines = raw.decode("utf-8").split("\n")
+        for number, text in entry["lines"].items():
+            self.assertEqual(lines[int(number) - 1], text, f"{entry['path']}:{number}")
+
+    def test_live_contract_still_matches_snapshot(self) -> None:
+        root = architecture_documents()
+        entry = source("contract")
+        if not (root / entry["path"]).is_file():
+            self.skipTest("architecture documents not available (set ARCHITECTURE_DOCS_ROOT or refresh the store snapshot)")
+        raw = (root / entry["path"]).read_bytes()
         self.assertEqual(
             hashlib.sha256(raw).hexdigest(),
             entry["sha256"],
