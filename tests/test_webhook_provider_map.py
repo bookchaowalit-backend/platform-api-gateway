@@ -63,7 +63,7 @@ def architecture_documents() -> Path:
     ~/.cache/solo-empire/architecture-docs, known by .snapshot.json; architecture-docs SPEC-001)."""
     configured = os.environ.get("ARCHITECTURE_DOCS_ROOT") or os.environ.get("SOLO_ARCHITECTURE_ROOT")
     if configured:
-        return Path(configured)
+        return Path(configured).expanduser()
     if DEFAULT_ARCH_DOCS.is_dir():
         return DEFAULT_ARCH_DOCS
     snapshot = Path(os.environ.get("SOLO_ARCHITECTURE_SNAPSHOT") or Path.home() / ".cache/solo-empire/architecture-docs")
@@ -447,8 +447,11 @@ class LiveSourceDriftTests(unittest.TestCase):
         entry = source("contract")
         self.assertEqual(entry["store"], {"space": "architecture-docs", "version": 1})
         root = architecture_documents()
-        if (root / ".git").exists() or not (root / entry["path"]).is_file():
+        if (root / ".git").exists() or not (root / ".snapshot.json").is_file():
             self.skipTest("no store snapshot of architecture-docs (git checkouts are covered above)")
+        # A snapshot holds every stored document, so a missing contract is a failure, not a skip.
+        # (A snapshot records no per-document version; the pinned version's sha256 is compared.)
+        self.assertTrue((root / entry["path"]).is_file(), f"snapshot has no {entry['path']}")
         raw = (root / entry["path"]).read_bytes()
         self.assertEqual(hashlib.sha256(raw).hexdigest(), entry["sha256"],
                          "snapshot contract differs from the pinned store version; re-pin and re-map")
